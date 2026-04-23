@@ -1,0 +1,2 @@
+"""CartBuddy backend package."""
+
