@@ -63,7 +63,7 @@ class OrderResponse(BaseModel):
     created_by: str
     max_wait_days: int
     expires_at: datetime
-    status: Literal["open", "expired", "closed"]
+    status: Literal["open", "expired", "closed", "ready_to_order", "ordered", "delivered", "cancelled"]
     extended_once: bool
     latitude: float
     longitude: float
@@ -78,6 +78,10 @@ class OrderResponse(BaseModel):
 
 class NearbyOrdersResponse(BaseModel):
     items: list[OrderResponse]
+
+
+class UpdateOrderStatusRequest(BaseModel):
+    status: Literal["ready_to_order", "ordered", "delivered", "cancelled"]
 
 
 class AddOrderLinkRequest(BaseModel):
@@ -99,6 +103,27 @@ class OrderLinksResponse(BaseModel):
     items: list[OrderLinkResponse]
     slots_used: int
     slots_max: int = 10
+
+
+class AddOrderMessageRequest(BaseModel):
+    message: str = Field(min_length=1, max_length=1000)
+
+
+class OrderMessageResponse(BaseModel):
+    id: str
+    order_id: str
+    user_name: str
+    message: str
+    created_at: datetime
+
+
+class OrderMessagesResponse(BaseModel):
+    items: list[OrderMessageResponse]
+
+
+class RegisterPushTokenRequest(BaseModel):
+    token: str = Field(min_length=10, max_length=512)
+    platform: Literal["ios", "android", "web", "unknown"] = "unknown"
 
 
 class NotificationResponse(BaseModel):

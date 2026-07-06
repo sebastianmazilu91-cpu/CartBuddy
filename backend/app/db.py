@@ -117,11 +117,36 @@ def init_db() -> None:
             )
             """
         )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS order_messages (
+                id TEXT PRIMARY KEY,
+                order_id TEXT NOT NULL,
+                user_name TEXT NOT NULL,
+                message TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (order_id) REFERENCES orders(id)
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS user_push_tokens (
+                token TEXT PRIMARY KEY,
+                user_name TEXT NOT NULL,
+                platform TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
         _migrate_orders_table(connection)
         _migrate_users_table(connection)
         _migrate_order_member_links_table(connection)
         _migrate_order_join_reservations_table(connection)
         _migrate_user_notifications_table(connection)
+        _migrate_order_messages_table(connection)
+        _migrate_user_push_tokens_table(connection)
         connection.commit()
 
 
@@ -251,3 +276,32 @@ def _migrate_user_notifications_table(connection: sqlite3.Connection) -> None:
     )
     if not _column_exists(connection, "user_notifications", "read"):
         connection.execute("ALTER TABLE user_notifications ADD COLUMN read INTEGER NOT NULL DEFAULT 0")
+
+
+def _migrate_order_messages_table(connection: sqlite3.Connection) -> None:
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS order_messages (
+            id TEXT PRIMARY KEY,
+            order_id TEXT NOT NULL,
+            user_name TEXT NOT NULL,
+            message TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY (order_id) REFERENCES orders(id)
+        )
+        """
+    )
+
+
+def _migrate_user_push_tokens_table(connection: sqlite3.Connection) -> None:
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS user_push_tokens (
+            token TEXT PRIMARY KEY,
+            user_name TEXT NOT NULL,
+            platform TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+        """
+    )

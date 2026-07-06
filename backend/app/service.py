@@ -1,14 +1,17 @@
 from __future__ import annotations
 
+import json
 import math
 from datetime import UTC, datetime, timedelta
 from urllib.parse import urlparse
+from urllib.request import Request, urlopen
 from uuid import uuid4
 
 from .db import get_connection
 from .schemas import (
     PLATFORMS,
     CreateOrderRequest,
+    OrderMessageResponse,
     NotificationResponse,
     OrderLinkResponse,
     OrderResponse,
@@ -17,6 +20,15 @@ from .schemas import (
 MAX_LINK_SLOTS_PER_MEMBER = 10
 JOIN_RESERVATION_MINUTES = 10
 NEARBY_PRIORITY_MAX_HOURS = 48
+EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send"
+PLATFORM_DOMAINS = {
+    "Amazon": ("amazon.", "amzn."),
+    "eMAG": ("emag.",),
+    "Temu": ("temu.",),
+    "AliExpress": ("aliexpress.", "aliexpress.us", "alicdn."),
+    "SHEIN": ("shein.",),
+    "Fashion Days": ("fashiondays.",),
+}
 
 
 def utc_now() -> datetime:
@@ -142,6 +154,16 @@ def _to_link_response(row: dict) -> OrderLinkResponse:
     )
 
 
+def _to_message_response(row: dict) -> OrderMessageResponse:
+    return OrderMessageResponse(
+        id=row["id"],
+        order_id=row["order_id"],
+        user_name=row["user_name"],
+        message=row["message"],
+        created_at=parse_iso(row["created_at"]),
+    )
+
+
 def _to_notification_response(row: dict) -> NotificationResponse:
     return NotificationResponse(
         id=row["id"],
@@ -157,6 +179,17 @@ def _to_notification_response(row: dict) -> NotificationResponse:
 def _is_valid_product_url(value: str) -> bool:
     parsed = urlparse(value.strip())
     return parsed.scheme in {"http", "https"} and bool(parsed.netloc)
+
+
+def _is_valid_platform_product_url(value: str, platform: str) -> bool:
+    parsed = urlparse(value.strip())
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return False
+    allowed_domains = PLATFORM_DOMAINS.get(platform)
+    if not allowed_domains:
+        return True
+    host = parsed.netloc.lower()
+    return any(domain in host for domain in allowed_domains)
 
 
 def _count_active_reservations(connection, order_id: str) -> int:
@@ -227,6 +260,48 @@ def _notify_user(
         """,
         (notification_id, user_name, event_type, title, message, related_order_id, utc_now_iso()),
     )
+    _send_push_to_user(connection, user_name=user_name, title=title, message=message, related_order_id=related_order_id)
+
+
+def _send_push_to_user(
+    connection,
+    user_name: str,
+    title: str,
+    message: str,
+    related_order_id: str | None = None,
+) -> None:
+    rows = connection.execute(
+        """
+        SELECT token
+        FROM user_push_tokens
+        WHERE user_name = ?
+        """,
+        (user_name,),
+    ).fetchall()
+    if not rows:
+        return
+
+    payload = [
+        {
+            "to": row["token"],
+            "sound": "default",
+            "title": title,
+            "body": message,
+            "data": {"related_order_id": related_order_id},
+        }
+        for row in rows
+    ]
+    request = Request(
+        EXPO_PUSH_URL,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urlopen(request, timeout=4):
+            pass
+    except Exception:
+        return
 
 
 def _compute_priority_score(
@@ -396,6 +471,24 @@ def create_order(payload: CreateOrderRequest, creator_name: str) -> OrderRespons
     )
 
 
+def register_push_token(user_name: str, token: str, platform: str) -> None:
+    clean_token = token.strip()
+    safe_platform = platform.strip().lower() or "unknown"
+    now = utc_now_iso()
+    with get_connection(write=True) as connection:
+        connection.execute(
+            """
+            INSERT INTO user_push_tokens(token, user_name, platform, created_at, updated_at)
+            VALUES(?, ?, ?, ?, ?)
+            ON CONFLICT(token) DO UPDATE SET
+                user_name = excluded.user_name,
+                platform = excluded.platform,
+                updated_at = excluded.updated_at
+            """,
+            (clean_token, user_name, safe_platform, now, now),
+        )
+
+
 def list_nearby_orders(
     latitude: float,
     longitude: float,
@@ -409,7 +502,7 @@ def list_nearby_orders(
     with get_connection(write=True) as connection:
         _cleanup_expired_reservations(connection)
         _mark_expired_orders(connection)
-        query = _order_select_sql("WHERE status = 'open' AND expires_at > ?")
+        query = _order_select_sql("WHERE status IN ('open', 'ready_to_order', 'ordered') AND expires_at > ?")
         params: list = [utc_now_iso()]
         if platform is not None:
             query += " AND platform = ?"
@@ -584,6 +677,51 @@ def extend_order_once(order_id: str, user_name: str) -> tuple[OrderResponse | No
     return response, "ok"
 
 
+def update_order_status(order_id: str, user_name: str, status: str) -> tuple[OrderResponse | None, str]:
+    allowed_statuses = {"ready_to_order", "ordered", "delivered", "cancelled"}
+    if status not in allowed_statuses:
+        return None, "invalid_status"
+
+    with get_connection(write=True) as connection:
+        _cleanup_expired_reservations(connection)
+        _mark_expired_orders(connection)
+        row = connection.execute(
+            _order_select_sql("WHERE id = ?"),
+            (order_id,),
+        ).fetchone()
+        if row is None:
+            return None, "not_found"
+        if row["created_by"] != user_name:
+            return None, "not_owner"
+        if row["status"] in {"delivered", "cancelled"}:
+            return None, "terminal_status"
+
+        connection.execute(
+            "UPDATE orders SET status = ? WHERE id = ?",
+            (status, order_id),
+        )
+        updated = connection.execute(
+            _order_select_sql("WHERE id = ?"),
+            (order_id,),
+        ).fetchone()
+        title_by_status = {
+            "ready_to_order": "Comanda este gata",
+            "ordered": "Comanda a fost plasata",
+            "delivered": "Comanda a fost livrata",
+            "cancelled": "Comanda a fost anulata",
+        }
+        for member_name in _member_names_for_order(connection, order_id):
+            _notify_user(
+                connection,
+                user_name=member_name,
+                event_type="order_status_changed",
+                title=title_by_status[status],
+                message=f"Statusul comenzii {updated['platform']} a fost actualizat.",
+                related_order_id=order_id,
+            )
+        return _build_order_response(connection, updated, user_name=user_name), "ok"
+
+
 def add_order_link(order_id: str, user_name: str, url: str) -> tuple[OrderLinkResponse | None, str]:
     clean_url = url.strip()
     if not _is_valid_product_url(clean_url):
@@ -591,11 +729,15 @@ def add_order_link(order_id: str, user_name: str, url: str) -> tuple[OrderLinkRe
 
     with get_connection(write=True) as connection:
         order = connection.execute(
-            "SELECT id, created_by FROM orders WHERE id = ?",
+            "SELECT id, created_by, platform, status FROM orders WHERE id = ?",
             (order_id,),
         ).fetchone()
         if order is None:
             return None, "not_found"
+        if order["status"] not in {"open", "ready_to_order"}:
+            return None, "order_locked"
+        if not _is_valid_platform_product_url(clean_url, order["platform"]):
+            return None, "invalid_url"
 
         member = connection.execute(
             """
@@ -690,6 +832,82 @@ def list_order_links(order_id: str, user_name: str) -> tuple[list[OrderLinkRespo
             ).fetchall()
 
     return [_to_link_response(row) for row in rows], "ok"
+
+
+def list_order_messages(order_id: str, user_name: str, limit: int = 100) -> tuple[list[OrderMessageResponse] | None, str]:
+    safe_limit = max(1, min(limit, 100))
+    with get_connection() as connection:
+        order = connection.execute(
+            "SELECT id FROM orders WHERE id = ?",
+            (order_id,),
+        ).fetchone()
+        if order is None:
+            return None, "not_found"
+        if not _user_is_member(connection, order_id, user_name):
+            return None, "not_member"
+
+        rows = connection.execute(
+            """
+            SELECT id, order_id, user_name, message, created_at
+            FROM order_messages
+            WHERE order_id = ?
+            ORDER BY created_at ASC
+            LIMIT ?
+            """,
+            (order_id, safe_limit),
+        ).fetchall()
+
+    return [_to_message_response(row) for row in rows], "ok"
+
+
+def add_order_message(order_id: str, user_name: str, message: str) -> tuple[OrderMessageResponse | None, str]:
+    clean_message = message.strip()
+    if not clean_message:
+        return None, "empty_message"
+
+    with get_connection(write=True) as connection:
+        order = connection.execute(
+            "SELECT id, status FROM orders WHERE id = ?",
+            (order_id,),
+        ).fetchone()
+        if order is None:
+            return None, "not_found"
+        if order["status"] in {"delivered", "cancelled"}:
+            return None, "order_locked"
+        if not _user_is_member(connection, order_id, user_name):
+            return None, "not_member"
+
+        message_id = str(uuid4())
+        now = utc_now_iso()
+        connection.execute(
+            """
+            INSERT INTO order_messages(id, order_id, user_name, message, created_at)
+            VALUES(?, ?, ?, ?, ?)
+            """,
+            (message_id, order_id, user_name, clean_message, now),
+        )
+        row = connection.execute(
+            """
+            SELECT id, order_id, user_name, message, created_at
+            FROM order_messages
+            WHERE id = ?
+            """,
+            (message_id,),
+        ).fetchone()
+
+        for member_name in _member_names_for_order(connection, order_id):
+            if member_name == user_name:
+                continue
+            _notify_user(
+                connection,
+                user_name=member_name,
+                event_type="order_message",
+                title="Mesaj nou in comanda",
+                message=f"{user_name}: {clean_message[:80]}",
+                related_order_id=order_id,
+            )
+
+    return _to_message_response(row), "ok"
 
 
 def get_member_slots_used(order_id: str, user_name: str) -> int:

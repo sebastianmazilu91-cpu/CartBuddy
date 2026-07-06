@@ -7,14 +7,20 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "backend": "python -m uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 8000"
+    "backend": "python -m uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 8000",
+    "typecheck": "tsc --noEmit",
+    "test:backend": "python -m pytest backend\\tests",
+    "check": "npm run typecheck && npm run test:backend"
   },
   "dependencies": {
-    "expo": "~54.0.33",
-    "expo-auth-session": "~7.0.10",
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "expo": "~54.0.35",
+    "expo-auth-session": "~7.0.11",
     "expo-location": "~19.0.8",
+    "expo-notifications": "~0.32.17",
+    "expo-secure-store": "~15.0.8",
     "expo-status-bar": "~3.0.9",
-    "expo-web-browser": "~15.0.10",
+    "expo-web-browser": "~15.0.11",
     "react": "19.1.0",
     "react-native": "0.81.5"
   },
