@@ -4,10 +4,11 @@ import sqlite3
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 import math
+import os
 from pathlib import Path
 from threading import Lock
 
-DB_PATH = Path(__file__).resolve().parent.parent / "cartbuddy.db"
+DB_PATH = Path(os.environ.get("CARTBUDDY_DB_PATH", Path(__file__).resolve().parent.parent / "cartbuddy.db"))
 WRITE_LOCK = Lock()
 
 

@@ -139,6 +139,58 @@ clang++: error: invalid linker name in argument '-fuse-ld=gold'
 
 Dezactivarea New Architecture evita acel build CMake/IPO si permite generarea APK-ului debug.
 
+## Deploy Backend Pe Railway
+
+Aplicatia Expo nu se deployeaza pe Railway. Pe Railway se deployeaza backendul FastAPI.
+
+Setari recomandate pentru serviciul Railway:
+
+- Repository: `sebastianmazilu91-cpu/CartBuddy`
+- Root Directory: `backend`
+- Builder: Nixpacks
+- Start Command:
+
+```bash
+uvicorn app.main:app --host 0.0.0.0 --port $PORT
+```
+
+Fisierele relevante sunt:
+
+- `backend/railpack.json`
+- `backend/railway.json`
+- `backend/runtime.txt`
+- `backend/requirements.txt`
+
+Pentru persistenta SQLite, creeaza un Railway Volume si monteaza-l la:
+
+```text
+/data
+```
+
+Apoi adauga variabila:
+
+```env
+CARTBUDDY_DB_PATH=/data/cartbuddy.db
+```
+
+Dupa deploy, Railway iti va da un domeniu de forma:
+
+```text
+https://numele-serviciului.up.railway.app
+```
+
+Actualizeaza `.env` pentru buildul mobil:
+
+```env
+EXPO_PUBLIC_API_BASE_URL=https://numele-serviciului.up.railway.app
+```
+
+Testeaza backendul Railway:
+
+```text
+https://numele-serviciului.up.railway.app/health
+```
+
 ## Reguli importante
 
 - `min_people`: 2-10.
