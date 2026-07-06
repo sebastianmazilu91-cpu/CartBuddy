@@ -22,7 +22,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.mazilinho1991.And_Py_Musketeers_App"
+      "package": "app.cartbuddy"
     },
     "web": {
       "favicon": "./assets/favicon.png"
