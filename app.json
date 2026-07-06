@@ -31,6 +31,12 @@
       "expo-web-browser",
       "expo-secure-store",
       "expo-notifications"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "32c886e7-09fe-4c3d-9f2f-93837d376e94"
+      }
+    },
+    "owner": "mazilinho1991"
   }
 }
