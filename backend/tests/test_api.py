@@ -43,6 +43,14 @@ def auth_headers(auth_response: dict) -> dict[str, str]:
     return {"Authorization": f"Bearer {auth_response['token']}"}
 
 
+def test_account_deletion_page_is_public(client: TestClient) -> None:
+    response = client.get("/account-deletion")
+
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+    assert "CartBuddy - solicitare stergere cont si date" in response.text
+
+
 def create_order(client: TestClient, auth_response: dict, min_people: int = 2) -> dict:
     response = client.post(
         "/orders",

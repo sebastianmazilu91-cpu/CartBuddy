@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 
 from .auth import create_user, login_user, login_with_google, require_user
 from .db import init_db
@@ -67,6 +68,66 @@ app.add_middleware(
 @app.get("/health")
 def health() -> dict:
     return {"status": "ok"}
+
+
+@app.get("/account-deletion", response_class=HTMLResponse, include_in_schema=False)
+def account_deletion() -> str:
+    return """
+    <!doctype html>
+    <html lang="ro">
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>CartBuddy - Stergerea contului</title>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.55; margin: 0; color: #1f2937; background: #f8fafc; }
+          main { max-width: 760px; margin: 0 auto; padding: 40px 20px; background: #fff; min-height: 100vh; }
+          h1 { color: #111827; margin-top: 0; }
+          h2 { color: #111827; margin-top: 28px; }
+          li { margin-bottom: 8px; }
+          .note { background: #eef2ff; border-left: 4px solid #4f46e5; padding: 12px 16px; }
+        </style>
+      </head>
+      <body>
+        <main>
+          <h1>CartBuddy - solicitare stergere cont si date</h1>
+          <p>
+            Aceasta pagina explica modul in care utilizatorii CartBuddy pot solicita stergerea
+            contului si a datelor asociate.
+          </p>
+
+          <h2>Cum soliciti stergerea</h2>
+          <ol>
+            <li>Trimite o cerere de stergere folosind adresa de contact a dezvoltatorului afisata in Google Play pentru CartBuddy.</li>
+            <li>Include adresa de email folosita la autentificarea in CartBuddy si numele de utilizator, daca il cunosti.</li>
+            <li>Scrie in subiect: "Stergere cont CartBuddy".</li>
+            <li>Vei primi confirmarea dupa procesarea cererii.</li>
+          </ol>
+
+          <h2>Date sterse</h2>
+          <ul>
+            <li>Contul utilizatorului: email, nume afisat, telefon, adresa si coordonate salvate.</li>
+            <li>Sesiunile de autentificare active.</li>
+            <li>Tokenurile pentru notificari push.</li>
+            <li>Notificarile asociate contului.</li>
+            <li>Datele operationale legate direct de cont, acolo unde stergerea nu afecteaza obligatii legale sau integritatea comenzilor existente.</li>
+          </ul>
+
+          <h2>Date care pot fi pastrate temporar</h2>
+          <p>
+            Unele informatii pot fi pastrate pentru o perioada limitata daca sunt necesare pentru
+            securitate, prevenirea abuzurilor, solutionarea disputelor, evidenta comenzilor sau
+            respectarea obligatiilor legale.
+          </p>
+
+          <p class="note">
+            CartBuddy nu vinde datele utilizatorilor. Datele sunt folosite pentru functionalitatea
+            aplicatiei: autentificare, comenzi, cautare nearby, chat pe comanda si notificari.
+          </p>
+        </main>
+      </body>
+    </html>
+    """
 
 
 @app.get("/platforms")
