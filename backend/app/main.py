@@ -130,6 +130,92 @@ def account_deletion() -> str:
     """
 
 
+@app.get("/privacy", response_class=HTMLResponse, include_in_schema=False)
+def privacy_policy() -> str:
+    return """
+    <!doctype html>
+    <html lang="ro">
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>CartBuddy - Politica de confidentialitate</title>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.55; margin: 0; color: #1f2937; background: #f8fafc; }
+          main { max-width: 820px; margin: 0 auto; padding: 40px 20px; background: #fff; min-height: 100vh; }
+          h1 { color: #111827; margin-top: 0; }
+          h2 { color: #111827; margin-top: 28px; }
+          li { margin-bottom: 8px; }
+          .muted { color: #6b7280; }
+        </style>
+      </head>
+      <body>
+        <main>
+          <h1>CartBuddy - Politica de confidentialitate</h1>
+          <p class="muted">Ultima actualizare: 8 iulie 2026</p>
+
+          <p>
+            Aceasta politica explica modul in care CartBuddy colecteaza, foloseste si protejeaza
+            datele utilizatorilor. CartBuddy ajuta utilizatorii sa creeze si sa se alature comenzilor
+            comune, sa comunice pe comenzi si sa primeasca notificari relevante.
+          </p>
+
+          <h2>Date colectate</h2>
+          <ul>
+            <li>Date de cont: email, nume afisat, telefon, adresa si date de autentificare.</li>
+            <li>Date de locatie: coordonate aproximative folosite pentru gasirea comenzilor nearby.</li>
+            <li>Date despre comenzi: platforma, numar minim de participanti, status, linkuri produse si detalii operationale.</li>
+            <li>Mesaje: continutul chatului asociat unei comenzi.</li>
+            <li>Notificari: tokenuri de notificari push si istoricul notificarilor din aplicatie.</li>
+            <li>Date tehnice de baza necesare functionarii serviciului.</li>
+          </ul>
+
+          <h2>Cum folosim datele</h2>
+          <ul>
+            <li>Pentru autentificarea si administrarea contului.</li>
+            <li>Pentru crearea, afisarea si gestionarea comenzilor.</li>
+            <li>Pentru cautarea comenzilor din apropiere.</li>
+            <li>Pentru chatul dintre membrii unei comenzi.</li>
+            <li>Pentru notificari despre comenzi, mesaje si schimbari de status.</li>
+            <li>Pentru securitate, prevenirea abuzurilor si imbunatatirea functionarii aplicatiei.</li>
+          </ul>
+
+          <h2>Partajarea datelor</h2>
+          <p>
+            CartBuddy nu vinde datele utilizatorilor. Datele pot fi procesate prin furnizori tehnici
+            necesari functionarii aplicatiei, cum ar fi hostingul backend-ului, serviciile de autentificare
+            si serviciile de notificari push.
+          </p>
+
+          <h2>Securitatea datelor</h2>
+          <p>
+            Datele sunt transmise prin conexiuni securizate HTTPS. Accesul la functionalitatile contului
+            este protejat prin autentificare.
+          </p>
+
+          <h2>Pastrarea si stergerea datelor</h2>
+          <p>
+            Datele sunt pastrate atat timp cat este necesar pentru functionarea contului si a comenzilor,
+            pentru securitate sau pentru respectarea obligatiilor legale. Utilizatorii pot solicita stergerea
+            contului si a datelor asociate folosind pagina:
+            <a href="/account-deletion">Stergere cont CartBuddy</a>.
+          </p>
+
+          <h2>Copii</h2>
+          <p>
+            CartBuddy nu este destinat copiilor sub 13 ani si nu colecteaza intentionat date de la acestia.
+          </p>
+
+          <h2>Contact</h2>
+          <p>
+            Pentru intrebari despre aceasta politica sau despre datele tale, foloseste adresa de contact
+            a dezvoltatorului afisata in pagina CartBuddy din Google Play.
+          </p>
+        </main>
+      </body>
+    </html>
+    """
+
+
 @app.get("/platforms")
 def platforms() -> dict:
     return {"items": list(PLATFORMS)}
