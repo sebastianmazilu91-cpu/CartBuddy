@@ -43,6 +43,17 @@ def auth_headers(auth_response: dict) -> dict[str, str]:
     return {"Authorization": f"Bearer {auth_response['token']}"}
 
 
+def test_health_includes_build_marker(client: TestClient) -> None:
+    health_response = client.get("/health")
+    version_response = client.get("/version")
+
+    assert health_response.status_code == 200
+    assert health_response.json()["status"] == "ok"
+    assert health_response.json()["build"] == "2026-07-08-legal-pages"
+    assert version_response.status_code == 200
+    assert version_response.json()["build"] == "2026-07-08-legal-pages"
+
+
 def test_account_deletion_page_is_public(client: TestClient) -> None:
     response = client.get("/account-deletion")
 

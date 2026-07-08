@@ -54,6 +54,8 @@ async def lifespan(_app: FastAPI):
     yield
 
 
+APP_BUILD = "2026-07-08-legal-pages"
+
 app = FastAPI(title="CartBuddy API", version="0.1.0", lifespan=lifespan)
 
 app.add_middleware(
@@ -67,7 +69,12 @@ app.add_middleware(
 
 @app.get("/health")
 def health() -> dict:
-    return {"status": "ok"}
+    return {"status": "ok", "build": APP_BUILD}
+
+
+@app.get("/version")
+def version() -> dict:
+    return {"name": "CartBuddy API", "build": APP_BUILD}
 
 
 @app.get("/account-deletion", response_class=HTMLResponse, include_in_schema=False)
