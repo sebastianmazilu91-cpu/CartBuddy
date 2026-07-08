@@ -1,0 +1,5 @@
+keytool -export -rfc -keystore "G:\And_Py_Musketeers_App\@mazilinho1991__And_Py_Musketeers_App.jks" -alias "2dc08904b08f4160d18c5e9783ceb498" -file "G:\And_Py_Musketeers_App\upload_certificate_cartbuddy.pem"
+
+Keystore password: 7f115eb998df749ca676bfd8a283cf26
+    Key alias:         2dc08904b08f4160d18c5e9783ceb498
+    Key password:      cfce0ca230913b8a4e4db8f880d8fe49
