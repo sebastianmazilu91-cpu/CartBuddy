@@ -1,5 +1,5 @@
 import * as Google from 'expo-auth-session/providers/google';
-import { StatusBar } from 'expo-status-bar';
+import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
 import * as Location from 'expo-location';
 import * as Notifications from 'expo-notifications';
 import * as WebBrowser from 'expo-web-browser';
@@ -13,6 +13,7 @@ import {
   SafeAreaView,
   ScrollView,
   StyleSheet,
+  StatusBar as NativeStatusBar,
   Text,
   View,
 } from 'react-native';
@@ -958,22 +959,11 @@ export default function App() {
   }
 
   return (
-    <SafeAreaView style={styles.screen}>
-      <StatusBar style="light" />
+    <SafeAreaView style={[styles.screen, styles.androidStatusBarInset]}>
+      <ExpoStatusBar style="light" />
       <View style={styles.header}>
         <Text style={styles.title}>CartBuddy</Text>
         <Text style={styles.subtitle}>Comenzi comune locale pentru cost mai mic la livrare.</Text>
-      </View>
-
-      <View style={styles.infoRow}>
-        <Text style={styles.infoText}>API: {API_BASE_URL}</Text>
-        <Text style={[styles.infoText, apiStatus === 'online' ? styles.online : styles.offline]}>
-          {apiStatus === 'online'
-            ? 'online'
-            : apiStatus === 'offline'
-              ? 'offline'
-              : 'checking'}
-        </Text>
       </View>
 
       {currentUser && (
@@ -1208,6 +1198,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#0f172a',
   },
+  androidStatusBarInset: {
+    paddingTop: Platform.OS === 'android' ? NativeStatusBar.currentHeight ?? 0 : 0,
+  },
   header: {
     paddingTop: 12,
     paddingHorizontal: 18,
@@ -1222,22 +1215,6 @@ const styles = StyleSheet.create({
     color: '#cbd5e1',
     marginTop: 4,
     fontSize: 14,
-  },
-  infoRow: {
-    paddingHorizontal: 14,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 6,
-  },
-  infoText: {
-    color: '#94a3b8',
-    fontSize: 12,
-  },
-  online: {
-    color: '#86efac',
-  },
-  offline: {
-    color: '#fca5a5',
   },
   userRow: {
     paddingHorizontal: 14,
