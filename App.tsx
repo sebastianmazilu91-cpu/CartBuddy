@@ -15,6 +15,7 @@ import {
   StyleSheet,
   StatusBar as NativeStatusBar,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
 
@@ -113,6 +114,10 @@ async function getExpoPushToken(): Promise<string | null> {
 }
 
 export default function App() {
+  const { width } = useWindowDimensions();
+  const isTabletLayout = width >= 600;
+  const tabletWidthStyle = isTabletLayout ? styles.tabletWidth : null;
+
   const [activeTab, setActiveTab] = useState<Tab>('home');
   const [locationState, setLocationState] = useState<'loading' | 'granted' | 'fallback'>('loading');
   const [myLocation, setMyLocation] = useState<Coordinate | null>(null);
@@ -961,13 +966,13 @@ export default function App() {
   return (
     <SafeAreaView style={[styles.screen, styles.androidStatusBarInset]}>
       <ExpoStatusBar style="light" />
-      <View style={styles.header}>
+      <View style={[styles.header, tabletWidthStyle]}>
         <Text style={styles.title}>CartBuddy</Text>
         <Text style={styles.subtitle}>Comenzi comune locale pentru cost mai mic la livrare.</Text>
       </View>
 
       {currentUser && (
-        <View style={styles.userRow}>
+        <View style={[styles.userRow, tabletWidthStyle]}>
           <Text style={styles.userText}>Logat: {currentUser.display_name}</Text>
           <View style={styles.userActionsRow}>
             <Text style={styles.headerNotifBadge}>{unreadNotificationsCount} notif</Text>
@@ -979,7 +984,7 @@ export default function App() {
       )}
 
       {activeTab !== 'home' && currentUser && (
-        <View style={styles.topNav}>
+        <View style={[styles.topNav, tabletWidthStyle]}>
           <Pressable onPress={() => setActiveTab('home')} style={styles.backButton}>
             <Text style={styles.backButtonText}>Inapoi la Home</Text>
           </Pressable>
@@ -987,21 +992,21 @@ export default function App() {
       )}
 
       {locationState === 'loading' && (
-        <View style={styles.locationNotice}>
+        <View style={[styles.locationNotice, tabletWidthStyle]}>
           <ActivityIndicator color="#84cc16" />
           <Text style={styles.noticeText}>Determin locatia...</Text>
         </View>
       )}
 
       {locationState === 'fallback' && (
-        <View style={styles.locationWarning}>
+        <View style={[styles.locationWarning, tabletWidthStyle]}>
           <Text style={styles.warningText}>
             Folosesc locatie demo (Bucuresti) deoarece permisiunea GPS lipseste.
           </Text>
         </View>
       )}
 
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={[styles.content, isTabletLayout && styles.tabletContent]}>
         {isRestoringAuth ? (
           <View style={styles.authCard}>
             <ActivityIndicator color="#84cc16" />
@@ -1201,6 +1206,11 @@ const styles = StyleSheet.create({
   androidStatusBarInset: {
     paddingTop: Platform.OS === 'android' ? NativeStatusBar.currentHeight ?? 0 : 0,
   },
+  tabletWidth: {
+    width: '100%',
+    maxWidth: 760,
+    alignSelf: 'center',
+  },
   header: {
     paddingTop: 12,
     paddingHorizontal: 18,
@@ -1296,6 +1306,12 @@ const styles = StyleSheet.create({
   content: {
     padding: 14,
     paddingBottom: 36,
+  },
+  tabletContent: {
+    width: '100%',
+    maxWidth: 760,
+    alignSelf: 'center',
+    paddingHorizontal: 18,
   },
   card: {
     backgroundColor: '#111827',
