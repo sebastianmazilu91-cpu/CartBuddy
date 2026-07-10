@@ -986,6 +986,44 @@ export default function App() {
     }
   }
 
+  async function openNearbyOrdersInGoogleMaps() {
+    if (!myLocation) {
+      Alert.alert(t('locationUnavailable'), t('noValidLocation'));
+      return;
+    }
+
+    const visibleOrders = orders.slice(0, 10);
+    const origin = `${myLocation.latitude},${myLocation.longitude}`;
+    const destination =
+      visibleOrders.length > 0
+        ? `${visibleOrders[visibleOrders.length - 1].latitude},${visibleOrders[visibleOrders.length - 1].longitude}`
+        : origin;
+    const waypoints = visibleOrders
+      .slice(0, -1)
+      .map((order) => `${order.latitude},${order.longitude}`)
+      .join('|');
+    const params = new URLSearchParams({
+      api: '1',
+      origin,
+      destination,
+      travelmode: 'driving',
+    });
+    if (waypoints) {
+      params.set('waypoints', waypoints);
+    }
+
+    const url =
+      visibleOrders.length > 0
+        ? `https://www.google.com/maps/dir/?${params.toString()}`
+        : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(origin)}`;
+
+    try {
+      await Linking.openURL(url);
+    } catch {
+      Alert.alert(t('invalidLink'), t('openLinkFailed'));
+    }
+  }
+
   async function openAndProcessLink(orderId: string, link: ProductLinkItem) {
     try {
       await Linking.openURL(link.url);
@@ -1317,12 +1355,20 @@ export default function App() {
             <Pressable onPress={loadNearbyOrders} style={styles.refreshButton}>
               <Text style={styles.refreshButtonText}>{t('refresh')}</Text>
             </Pressable>
-            <Pressable
-              onPress={() => setIsNearbyMapOpen((value) => !value)}
-              style={styles.mapToggleButton}
-            >
-              <Text style={styles.mapToggleButtonText}>{isNearbyMapOpen ? t('showList') : t('openMap')}</Text>
-            </Pressable>
+            <View style={styles.mapActionsRow}>
+              <Pressable
+                onPress={() => setIsNearbyMapOpen((value) => !value)}
+                style={styles.mapToggleButton}
+              >
+                <Text style={styles.mapToggleButtonText}>{isNearbyMapOpen ? t('showList') : t('openMap')}</Text>
+              </Pressable>
+              <Pressable
+                onPress={openNearbyOrdersInGoogleMaps}
+                style={styles.mapToggleButton}
+              >
+                <Text style={styles.mapToggleButtonText}>{t('openGoogleMaps')}</Text>
+              </Pressable>
+            </View>
 
             <View style={styles.ordersSection}>
               {isLoadingOrders ? (
@@ -1624,13 +1670,18 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 13,
   },
+  mapActionsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 8,
+  },
   mapToggleButton: {
+    flex: 1,
     borderRadius: 10,
     borderColor: '#38bdf8',
     borderWidth: 1,
     paddingVertical: 10,
     alignItems: 'center',
-    marginTop: 8,
     backgroundColor: '#0f172a',
   },
   mapToggleButtonText: {
