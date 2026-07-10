@@ -15,6 +15,9 @@ from .schemas import (
     NotificationResponse,
     OrderLinkResponse,
     OrderResponse,
+    RatingCandidateResponse,
+    RatingCommentResponse,
+    UserRatingSummaryResponse,
 )
 
 MAX_LINK_SLOTS_PER_MEMBER = 10
@@ -350,7 +353,7 @@ def _build_order_response(
         else None
     )
 
-    return _to_order_response(
+    response = _to_order_response(
         row,
         distance_meters=distance_meters,
         reserved_people=reserved_people,
@@ -358,6 +361,70 @@ def _build_order_response(
         join_state=join_state,
         my_reservation_expires_at=my_reservation_expires_at,
         priority_score=priority_score,
+    )
+    response.creator_rating_summary = _user_rating_summary(connection, row["created_by"])
+    if user_name and row["status"] == "delivered" and join_state == "joined":
+        members = _member_names_for_order(connection, row["id"])
+        ratings = connection.execute(
+            """
+            SELECT target_user_name, score, comment FROM order_ratings
+            WHERE order_id = ? AND reviewer_name = ?
+            """,
+            (row["id"], user_name),
+        ).fetchall()
+        submitted = {rating["target_user_name"]: rating for rating in ratings}
+        response.rating_candidates = [
+            RatingCandidateResponse(
+                user_name=member_name,
+                category="organizer" if member_name == row["created_by"] else "participant",
+                score=submitted[member_name]["score"] if member_name in submitted else None,
+                comment=submitted[member_name]["comment"] if member_name in submitted else None,
+                rating_summary=_user_rating_summary(connection, member_name),
+            )
+            for member_name in members
+            if member_name != user_name
+        ]
+    return response
+
+
+def _user_rating_summary(connection, user_name: str) -> UserRatingSummaryResponse:
+    aggregates = connection.execute(
+        """
+        SELECT category, ROUND(AVG(score), 2) AS average, COUNT(*) AS total
+        FROM order_ratings
+        WHERE target_user_name = ?
+        GROUP BY category
+        """,
+        (user_name,),
+    ).fetchall()
+    by_category = {row["category"]: row for row in aggregates}
+    comments = connection.execute(
+        """
+        SELECT reviewer_name, category, score, comment, created_at
+        FROM order_ratings
+        WHERE target_user_name = ? AND comment <> ''
+        ORDER BY created_at DESC
+        LIMIT 5
+        """,
+        (user_name,),
+    ).fetchall()
+    organizer = by_category.get("organizer")
+    participant = by_category.get("participant")
+    return UserRatingSummaryResponse(
+        organizer_average=organizer["average"] if organizer else None,
+        organizer_count=organizer["total"] if organizer else 0,
+        participant_average=participant["average"] if participant else None,
+        participant_count=participant["total"] if participant else 0,
+        recent_comments=[
+            RatingCommentResponse(
+                reviewer_name=item["reviewer_name"],
+                category=item["category"],
+                score=item["score"],
+                comment=item["comment"],
+                created_at=parse_iso(item["created_at"]),
+            )
+            for item in comments
+        ],
     )
 
 
@@ -532,10 +599,58 @@ def list_my_orders(user_name: str) -> list[OrderResponse]:
         _cleanup_expired_reservations(connection)
         _mark_expired_orders(connection)
         rows = connection.execute(
-            _order_select_sql("WHERE created_by = ? ORDER BY created_at DESC"),
+            _order_select_sql(
+                "WHERE id IN (SELECT order_id FROM order_members WHERE user_name = ?) ORDER BY created_at DESC"
+            ),
             (user_name,),
         ).fetchall()
         return [_build_order_response(connection, row, user_name=user_name) for row in rows]
+
+
+def submit_order_rating(
+    order_id: str,
+    reviewer_name: str,
+    target_user_name: str,
+    score: int,
+    comment: str,
+) -> tuple[RatingCandidateResponse | None, str]:
+    with get_connection(write=True) as connection:
+        order = connection.execute(
+            "SELECT id, created_by, status FROM orders WHERE id = ?",
+            (order_id,),
+        ).fetchone()
+        if order is None:
+            return None, "not_found"
+        if order["status"] != "delivered":
+            return None, "not_delivered"
+        if reviewer_name == target_user_name:
+            return None, "self_rating"
+        if not _user_is_member(connection, order_id, reviewer_name) or not _user_is_member(
+            connection, order_id, target_user_name
+        ):
+            return None, "not_member"
+
+        category = "organizer" if target_user_name == order["created_by"] else "participant"
+        try:
+            connection.execute(
+                """
+                INSERT INTO order_ratings(
+                    id, order_id, reviewer_name, target_user_name, category, score, comment, created_at
+                ) VALUES(?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (str(uuid4()), order_id, reviewer_name, target_user_name, category, score, comment, utc_now_iso()),
+            )
+        except Exception as exc:
+            if "UNIQUE constraint failed" in str(exc):
+                return None, "already_rated"
+            raise
+        return RatingCandidateResponse(
+            user_name=target_user_name,
+            category=category,
+            score=score,
+            comment=comment,
+            rating_summary=_user_rating_summary(connection, target_user_name),
+        ), "ok"
 
 
 def join_order(order_id: str, user_name: str) -> tuple[OrderResponse | None, str]:

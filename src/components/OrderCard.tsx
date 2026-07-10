@@ -1,4 +1,5 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useState } from 'react';
 
 import { JOIN_RESERVATION_MINUTES, MAX_PRODUCT_LINK_SLOTS } from '../constants';
 import {
@@ -9,7 +10,7 @@ import {
   timeLeftLabel,
 } from '../formatters';
 import { translate, type Language, type TranslationKey } from '../i18n';
-import type { OrderItem, OrderMessageItem, OrderStatus, ProductLinkItem } from '../types';
+import type { OrderItem, OrderMessageItem, OrderStatus, ProductLinkItem, UserRatingSummary } from '../types';
 
 const CURRENCY_SYMBOLS: Record<string, string> = {
   EUR: '€', USD: '$', RON: 'lei', GBP: '£', MDL: 'L', CHF: 'CHF',
@@ -34,17 +35,48 @@ function OrderCosts({ language, order }: { language: Language; order: OrderItem 
   );
 }
 
+function RatingSummary({ language, summary }: { language: Language; summary: UserRatingSummary | null }) {
+  const t = (key: TranslationKey) => translate(language, key);
+  if (!summary || (summary.organizer_count === 0 && summary.participant_count === 0)) {
+    return <Text style={styles.noRatings}>{t('noRatingsYet')}</Text>;
+  }
+  return (
+    <View style={styles.publicRatingBox}>
+      {summary.organizer_count > 0 && (
+        <Text style={styles.ratingAverage}>
+          {t('organizerRating')}: ★ {summary.organizer_average}/5 ({summary.organizer_count})
+        </Text>
+      )}
+      {summary.participant_count > 0 && (
+        <Text style={styles.ratingAverage}>
+          {t('participantRating')}: ★ {summary.participant_average}/5 ({summary.participant_count})
+        </Text>
+      )}
+      {summary.recent_comments.map((item, index) => (
+        <Text key={`${item.created_at}-${index}`} style={styles.publicComment}>
+          “{item.comment}” — {item.reviewer_name}, {item.score}/5
+        </Text>
+      ))}
+    </View>
+  );
+}
+
 type MyOrderCardProps = {
   language: Language;
   order: OrderItem;
+  currentUserName: string;
   onExtend: (orderId: string) => void;
   onStatusChange: (orderId: string, status: OrderStatus) => void;
+  onRate: (orderId: string, targetUserName: string, score: number, comment: string) => void;
 };
 
-export function MyOrderCard({ language, order, onExtend, onStatusChange }: MyOrderCardProps) {
+export function MyOrderCard({ language, order, currentUserName, onExtend, onStatusChange, onRate }: MyOrderCardProps) {
   const t = (key: TranslationKey) => translate(language, key);
-  const canExtend = order.status === 'expired' && !order.extended_once;
-  const canUpdateStatus = !['delivered', 'cancelled'].includes(order.status);
+  const isOrganizer = order.created_by === currentUserName;
+  const [ratingScores, setRatingScores] = useState<Record<string, number>>({});
+  const [ratingComments, setRatingComments] = useState<Record<string, string>>({});
+  const canExtend = isOrganizer && order.status === 'expired' && !order.extended_once;
+  const canUpdateStatus = isOrganizer && !['delivered', 'cancelled'].includes(order.status);
 
   return (
     <View style={styles.orderCard}>
@@ -57,6 +89,8 @@ export function MyOrderCard({ language, order, onExtend, onStatusChange }: MyOrd
       <Text style={styles.orderMeta}>{t('timeLeft')}: {timeLeftLabel(order.expires_at, language)}</Text>
       <Text style={styles.orderMeta}>{t('extensionUsed')}: {order.extended_once ? t('yes') : t('no')}</Text>
       <OrderCosts language={language} order={order} />
+      <Text style={styles.reputationLabel}>{t('organizerReputation')}</Text>
+      <RatingSummary language={language} summary={order.creator_rating_summary} />
 
       {canExtend && (
         <Pressable onPress={() => onExtend(order.id)} style={styles.secondaryButton}>
@@ -78,6 +112,68 @@ export function MyOrderCard({ language, order, onExtend, onStatusChange }: MyOrd
           <Pressable onPress={() => onStatusChange(order.id, 'cancelled')} style={styles.smallDangerButton}>
             <Text style={styles.smallDangerButtonText}>{t('cancel')}</Text>
           </Pressable>
+        </View>
+      )}
+
+      {order.status === 'delivered' && order.rating_candidates.length > 0 && (
+        <View style={styles.ratingPanel}>
+          <Text style={styles.ratingTitle}>{t('rateOrderMembers')}</Text>
+          {order.rating_candidates.map((candidate) => (
+            <View key={candidate.user_name} style={styles.ratingRow}>
+              <View style={styles.ratingIdentity}>
+                <Text style={styles.ratingUser}>{candidate.user_name}</Text>
+                <Text style={styles.ratingCategory}>
+                  {candidate.category === 'organizer' ? t('organizerRating') : t('participantRating')}
+                </Text>
+              </View>
+              {candidate.score === null ? (
+                <View style={styles.ratingForm}>
+                  <View style={styles.starsRow}>
+                    {[1, 2, 3, 4, 5].map((score) => (
+                      <Pressable
+                        key={score}
+                        onPress={() => setRatingScores((previous) => ({ ...previous, [candidate.user_name]: score }))}
+                      >
+                        <Text style={styles.starButton}>
+                          {score <= (ratingScores[candidate.user_name] ?? 0) ? '★' : '☆'}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                  <TextInput
+                    value={ratingComments[candidate.user_name] ?? ''}
+                    onChangeText={(comment) => setRatingComments((previous) => ({
+                      ...previous,
+                      [candidate.user_name]: comment,
+                    }))}
+                    placeholder={t('ratingCommentPlaceholder')}
+                    placeholderTextColor="#64748b"
+                    style={styles.ratingInput}
+                    maxLength={500}
+                    multiline
+                  />
+                  <Pressable
+                    style={styles.submitRatingButton}
+                    onPress={() => onRate(
+                      order.id,
+                      candidate.user_name,
+                      ratingScores[candidate.user_name] ?? 0,
+                      ratingComments[candidate.user_name] ?? '',
+                    )}
+                  >
+                    <Text style={styles.submitRatingText}>{t('submitRating')}</Text>
+                  </Pressable>
+                </View>
+              ) : (
+                <View>
+                  <Text style={styles.ratingGiven}>{'★'.repeat(candidate.score)} {candidate.score}/5</Text>
+                  {candidate.comment && <Text style={styles.ownComment}>“{candidate.comment}”</Text>}
+                </View>
+              )}
+              <RatingSummary language={language} summary={candidate.rating_summary} />
+            </View>
+          ))}
+          <Text style={styles.ratingNote}>{t('ratingFinalNote')}</Text>
         </View>
       )}
     </View>
@@ -158,6 +254,7 @@ export function NearbyOrderCard({
     <View style={styles.orderCard}>
       <Text style={styles.orderTitle}>{order.platform}</Text>
       <Text style={styles.orderMeta}>{t('initiatedBy')}: {order.created_by}</Text>
+      <RatingSummary language={language} summary={order.creator_rating_summary} />
       {matchPercent !== null && <Text style={styles.orderMeta}>{t('matchScore')}: {matchPercent}%</Text>}
       <Text style={styles.orderMeta}>
         {t('distance')}: {order.distance_meters === null ? '-' : formatDistance(order.distance_meters)}
@@ -515,6 +612,111 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 6,
     marginTop: 6,
+  },
+  ratingPanel: {
+    marginTop: 8,
+    paddingTop: 9,
+    borderTopWidth: 1,
+    borderTopColor: '#334155',
+    gap: 8,
+  },
+  ratingTitle: {
+    color: '#f8fafc',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  ratingRow: {
+    alignItems: 'stretch',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#334155',
+    borderRadius: 9,
+    padding: 8,
+  },
+  ratingIdentity: {
+    flex: 1,
+  },
+  ratingUser: {
+    color: '#e2e8f0',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  ratingCategory: {
+    color: '#94a3b8',
+    fontSize: 10,
+  },
+  starsRow: {
+    flexDirection: 'row',
+    gap: 3,
+  },
+  starButton: {
+    color: '#facc15',
+    fontSize: 25,
+    lineHeight: 28,
+  },
+  ratingGiven: {
+    color: '#facc15',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  ratingNote: {
+    color: '#64748b',
+    fontSize: 10,
+  },
+  reputationLabel: {
+    color: '#94a3b8',
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: 3,
+  },
+  publicRatingBox: {
+    gap: 2,
+    marginTop: 2,
+  },
+  ratingAverage: {
+    color: '#facc15',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  publicComment: {
+    color: '#cbd5e1',
+    fontSize: 10,
+    fontStyle: 'italic',
+  },
+  noRatings: {
+    color: '#64748b',
+    fontSize: 10,
+  },
+  ratingForm: {
+    width: '100%',
+    gap: 5,
+  },
+  ratingInput: {
+    borderWidth: 1,
+    borderColor: '#475569',
+    borderRadius: 8,
+    paddingHorizontal: 9,
+    paddingVertical: 7,
+    color: '#f8fafc',
+    minHeight: 48,
+    fontSize: 11,
+  },
+  submitRatingButton: {
+    alignSelf: 'flex-end',
+    borderRadius: 8,
+    backgroundColor: '#84cc16',
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  submitRatingText: {
+    color: '#132b02',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  ownComment: {
+    color: '#cbd5e1',
+    fontSize: 10,
+    fontStyle: 'italic',
   },
   smallStatusButton: {
     borderRadius: 999,

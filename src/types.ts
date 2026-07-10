@@ -50,6 +50,32 @@ export type OrderItem = {
   processing_fee: number;
   minimum_order_value: number | null;
   currency: string;
+  rating_candidates: RatingCandidate[];
+  creator_rating_summary: UserRatingSummary | null;
+};
+
+export type RatingCandidate = {
+  user_name: string;
+  category: 'organizer' | 'participant';
+  score: number | null;
+  comment: string | null;
+  rating_summary: UserRatingSummary | null;
+};
+
+export type RatingComment = {
+  reviewer_name: string;
+  category: 'organizer' | 'participant';
+  score: number;
+  comment: string;
+  created_at: string;
+};
+
+export type UserRatingSummary = {
+  organizer_average: number | null;
+  organizer_count: number;
+  participant_average: number | null;
+  participant_count: number;
+  recent_comments: RatingComment[];
 };
 
 export type ProductLinkItem = {

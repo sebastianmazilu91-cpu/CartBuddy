@@ -23,6 +23,8 @@ from .schemas import (
     PLATFORMS,
     RegisterPushTokenRequest,
     RegisterRequest,
+    RatingCandidateResponse,
+    SubmitRatingRequest,
     UpdateOrderStatusRequest,
     UpdateProfileRequest,
     UserResponse,
@@ -44,6 +46,7 @@ from .service import (
     mark_user_notification_read,
     process_order_link,
     register_push_token,
+    submit_order_rating,
     update_order_status,
 )
 
@@ -364,6 +367,30 @@ def post_order_status(
             raise HTTPException(status_code=422, detail="Invalid order status")
         raise HTTPException(status_code=404, detail="Order not found")
     return item
+
+
+@app.post("/orders/{order_id}/ratings", response_model=RatingCandidateResponse)
+def post_order_rating(
+    order_id: str,
+    payload: SubmitRatingRequest,
+    current_user: dict = Depends(require_user),
+) -> RatingCandidateResponse:
+    rating, reason = submit_order_rating(
+        order_id=order_id,
+        reviewer_name=current_user["display_name"],
+        target_user_name=payload.target_user_name,
+        score=payload.score,
+        comment=payload.comment,
+    )
+    if rating is None:
+        if reason in {"not_member", "self_rating"}:
+            raise HTTPException(status_code=403, detail="Only other order members can be rated")
+        if reason == "not_delivered":
+            raise HTTPException(status_code=409, detail="Order must be delivered before rating")
+        if reason == "already_rated":
+            raise HTTPException(status_code=409, detail="User already rated for this order")
+        raise HTTPException(status_code=404, detail="Order not found")
+    return rating
 
 
 @app.get("/orders/{order_id}/links", response_model=OrderLinksResponse)

@@ -1104,6 +1104,28 @@ export default function App() {
     }
   }
 
+  async function rateOrderMember(orderId: string, targetUserName: string, score: number, comment: string) {
+    if (apiStatus !== 'online' || !authToken) {
+      Alert.alert('Backend/Auth', t('authRequired'));
+      return;
+    }
+    if (score < 1 || score > 5 || comment.trim().length < 2) {
+      Alert.alert(t('incompleteRating'), t('incompleteRatingMessage'));
+      return;
+    }
+    try {
+      await fetchJson(`${API_BASE_URL}/orders/${orderId}/ratings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ target_user_name: targetUserName, score, comment: comment.trim() }),
+      });
+      await loadMyOrders();
+      Alert.alert(t('ratingSaved'), t('ratingSavedMessage'));
+    } catch {
+      Alert.alert(t('error'), t('ratingFailed'));
+    }
+  }
+
   return (
     <SafeAreaProvider>
       <SafeAreaView style={[styles.screen, styles.androidStatusBarInset]}>
@@ -1389,8 +1411,10 @@ export default function App() {
                     key={order.id}
                     language={language}
                     order={order}
+                    currentUserName={currentUser.display_name}
                     onExtend={extendOrder}
                     onStatusChange={updateOrderStatus}
+                    onRate={rateOrderMember}
                   />
                 ))}
               </View>

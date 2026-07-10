@@ -74,6 +74,30 @@ class CreateOrderRequest(BaseModel):
         return normalized
 
 
+class RatingCommentResponse(BaseModel):
+    reviewer_name: str
+    category: Literal["organizer", "participant"]
+    score: int
+    comment: str
+    created_at: datetime
+
+
+class UserRatingSummaryResponse(BaseModel):
+    organizer_average: float | None = None
+    organizer_count: int = 0
+    participant_average: float | None = None
+    participant_count: int = 0
+    recent_comments: list[RatingCommentResponse] = Field(default_factory=list)
+
+
+class RatingCandidateResponse(BaseModel):
+    user_name: str
+    category: Literal["organizer", "participant"]
+    score: int | None = None
+    comment: str | None = None
+    rating_summary: UserRatingSummaryResponse | None = None
+
+
 class OrderResponse(BaseModel):
     id: str
     platform: Platform
@@ -97,6 +121,8 @@ class OrderResponse(BaseModel):
     processing_fee: float
     minimum_order_value: float | None = None
     currency: str
+    rating_candidates: list[RatingCandidateResponse] = Field(default_factory=list)
+    creator_rating_summary: UserRatingSummaryResponse | None = None
 
 
 class NearbyOrdersResponse(BaseModel):
@@ -105,6 +131,17 @@ class NearbyOrdersResponse(BaseModel):
 
 class UpdateOrderStatusRequest(BaseModel):
     status: Literal["ready_to_order", "ordered", "delivered", "cancelled"]
+
+
+class SubmitRatingRequest(BaseModel):
+    target_user_name: str = Field(min_length=2, max_length=64)
+    score: int = Field(ge=1, le=5)
+    comment: str = Field(min_length=2, max_length=500)
+
+    @field_validator("comment")
+    @classmethod
+    def clean_comment(cls, value: str) -> str:
+        return " ".join(value.strip().split())
 
 
 class AddOrderLinkRequest(BaseModel):

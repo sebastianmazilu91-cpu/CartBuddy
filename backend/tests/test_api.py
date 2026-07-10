@@ -381,6 +381,55 @@ def test_creator_can_update_order_status(client: TestClient) -> None:
     assert terminal_response.status_code == 409
 
 
+def test_delivered_order_members_can_rate_each_other_once(client: TestClient) -> None:
+    creator = register_user(client, "RatingOrganizer")
+    member = register_user(client, "RatingParticipant")
+    order = create_order(client, creator, min_people=2)
+    client.post(f"/orders/{order['id']}/join", headers=auth_headers(member))
+    client.post(f"/orders/{order['id']}/join", headers=auth_headers(member))
+
+    early_rating = client.post(
+        f"/orders/{order['id']}/ratings",
+        headers=auth_headers(member),
+        json={"target_user_name": "RatingOrganizer", "score": 5, "comment": "Organizare excelenta"},
+    )
+    assert early_rating.status_code == 409
+
+    client.post(
+        f"/orders/{order['id']}/status",
+        headers=auth_headers(creator),
+        json={"status": "delivered"},
+    )
+    rating = client.post(
+        f"/orders/{order['id']}/ratings",
+        headers=auth_headers(member),
+        json={"target_user_name": "RatingOrganizer", "score": 5, "comment": "Organizare excelenta"},
+    )
+    assert rating.status_code == 200, rating.text
+    rating_payload = rating.json()
+    assert rating_payload["user_name"] == "RatingOrganizer"
+    assert rating_payload["category"] == "organizer"
+    assert rating_payload["score"] == 5
+    assert rating_payload["comment"] == "Organizare excelenta"
+    assert rating_payload["rating_summary"]["organizer_average"] == 5
+
+    duplicate = client.post(
+        f"/orders/{order['id']}/ratings",
+        headers=auth_headers(member),
+        json={"target_user_name": "RatingOrganizer", "score": 4, "comment": "Alta nota"},
+    )
+    assert duplicate.status_code == 409
+
+    member_orders = client.get("/orders/mine", headers=auth_headers(member)).json()["items"]
+    delivered = next(item for item in member_orders if item["id"] == order["id"])
+    candidate = delivered["rating_candidates"][0]
+    assert candidate["user_name"] == "RatingOrganizer"
+    assert candidate["category"] == "organizer"
+    assert candidate["score"] == 5
+    assert candidate["comment"] == "Organizare excelenta"
+    assert candidate["rating_summary"]["recent_comments"][0]["comment"] == "Organizare excelenta"
+
+
 def test_order_flow_locks_links_after_ordered_and_chat_after_delivered(client: TestClient) -> None:
     creator = register_user(client, "FlowOwner")
     member = register_user(client, "FlowMember")

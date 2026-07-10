@@ -145,6 +145,22 @@ def init_db() -> None:
             )
             """
         )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS order_ratings (
+                id TEXT PRIMARY KEY,
+                order_id TEXT NOT NULL,
+                reviewer_name TEXT NOT NULL,
+                target_user_name TEXT NOT NULL,
+                category TEXT NOT NULL,
+                score INTEGER NOT NULL CHECK(score BETWEEN 1 AND 5),
+                comment TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL,
+                UNIQUE(order_id, reviewer_name, target_user_name),
+                FOREIGN KEY (order_id) REFERENCES orders(id)
+            )
+            """
+        )
         _migrate_orders_table(connection)
         _migrate_users_table(connection)
         _migrate_order_member_links_table(connection)
@@ -152,6 +168,7 @@ def init_db() -> None:
         _migrate_user_notifications_table(connection)
         _migrate_order_messages_table(connection)
         _migrate_user_push_tokens_table(connection)
+        _migrate_order_ratings_table(connection)
         connection.commit()
 
 
@@ -319,3 +336,24 @@ def _migrate_user_push_tokens_table(connection: sqlite3.Connection) -> None:
         )
         """
     )
+
+
+def _migrate_order_ratings_table(connection: sqlite3.Connection) -> None:
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS order_ratings (
+            id TEXT PRIMARY KEY,
+            order_id TEXT NOT NULL,
+            reviewer_name TEXT NOT NULL,
+            target_user_name TEXT NOT NULL,
+            category TEXT NOT NULL,
+            score INTEGER NOT NULL CHECK(score BETWEEN 1 AND 5),
+            comment TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL,
+            UNIQUE(order_id, reviewer_name, target_user_name),
+            FOREIGN KEY (order_id) REFERENCES orders(id)
+        )
+        """
+    )
+    if not _column_exists(connection, "order_ratings", "comment"):
+        connection.execute("ALTER TABLE order_ratings ADD COLUMN comment TEXT NOT NULL DEFAULT ''")
