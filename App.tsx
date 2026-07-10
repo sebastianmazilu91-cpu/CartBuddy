@@ -201,6 +201,7 @@ export default function App() {
       googleExpoClientId ||
       googleWebClientId ||
       '000000000000-expo-placeholder.apps.googleusercontent.com',
+    redirectUri: 'app.cartbuddy:/oauthredirect',
     scopes: ['openid', 'profile', 'email'],
   });
 
@@ -584,11 +585,6 @@ export default function App() {
         Alert.alert('Locatie indisponibila', 'Nu am putut detecta geolocatia pentru adresa.');
         return;
       }
-      if (phone.trim().length < 7) {
-        Alert.alert('Date incomplete', 'Introdu numarul de telefon pentru profil.');
-        return;
-      }
-
       setIsAuthSubmitting(true);
       try {
         const result = await fetchJson<AuthResponse>(`${API_BASE_URL}/auth/google`, {
@@ -596,7 +592,6 @@ export default function App() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             access_token: accessToken,
-            phone: phone.trim(),
             address: detectedAddress || `Lat ${myLocation.latitude}, Lon ${myLocation.longitude}`,
             latitude: myLocation.latitude,
             longitude: myLocation.longitude,
@@ -613,7 +608,7 @@ export default function App() {
         setIsAuthSubmitting(false);
       }
     },
-    [apiStatus, detectedAddress, myLocation, phone],
+    [apiStatus, detectedAddress, myLocation],
   );
 
   useEffect(() => {

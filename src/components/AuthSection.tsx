@@ -53,6 +53,27 @@ export function AuthSection({
     <View style={styles.authCard}>
       <Text style={styles.sectionTitle}>Autentificare</Text>
 
+      <Text style={styles.stepLabel}>1. Alege actiunea</Text>
+      <View style={styles.authModeRow}>
+        <Pressable
+          onPress={() => onAuthModeChange('login')}
+          style={[styles.authModeButton, authMode === 'login' && styles.authModeButtonActive]}
+        >
+          <Text style={[styles.authModeText, authMode === 'login' && styles.authModeTextActive]}>
+            Login
+          </Text>
+        </Pressable>
+        <Pressable
+          onPress={() => onAuthModeChange('register')}
+          style={[styles.authModeButton, authMode === 'register' && styles.authModeButtonActive]}
+        >
+          <Text style={[styles.authModeText, authMode === 'register' && styles.authModeTextActive]}>
+            Inregistrare
+          </Text>
+        </Pressable>
+      </View>
+
+      <Text style={styles.stepLabel}>2. Alege metoda</Text>
       <View style={styles.authProviderRow}>
         <Pressable
           onPress={() => onAuthProviderChange('email')}
@@ -72,27 +93,9 @@ export function AuthSection({
         </Pressable>
       </View>
 
+      <Text style={styles.stepLabel}>3. Continua</Text>
       {authProvider === 'email' ? (
         <>
-          <View style={styles.authModeRow}>
-            <Pressable
-              onPress={() => onAuthModeChange('login')}
-              style={[styles.authModeButton, authMode === 'login' && styles.authModeButtonActive]}
-            >
-              <Text style={[styles.authModeText, authMode === 'login' && styles.authModeTextActive]}>
-                Login
-              </Text>
-            </Pressable>
-            <Pressable
-              onPress={() => onAuthModeChange('register')}
-              style={[styles.authModeButton, authMode === 'register' && styles.authModeButtonActive]}
-            >
-              <Text style={[styles.authModeText, authMode === 'register' && styles.authModeTextActive]}>
-                Register
-              </Text>
-            </Pressable>
-          </View>
-
           {authMode === 'register' && (
             <>
               <TextInput
@@ -145,14 +148,6 @@ export function AuthSection({
         </>
       ) : (
         <>
-          <TextInput
-            value={phone}
-            onChangeText={onPhoneChange}
-            placeholder="Numar telefon (obligatoriu)"
-            placeholderTextColor="#94a3b8"
-            style={styles.input}
-            keyboardType="phone-pad"
-          />
           <AddressBox value={addressLabel} />
 
           <Pressable
@@ -161,7 +156,11 @@ export function AuthSection({
             disabled={isAuthSubmitting || !googleReady || !googleEnabled}
           >
             <Text style={styles.googleButtonText}>
-              {isAuthSubmitting ? 'Se proceseaza...' : 'Continua cu Google'}
+              {isAuthSubmitting
+                ? 'Se proceseaza...'
+                : authMode === 'login'
+                  ? 'Login cu Google'
+                  : 'Inregistrare cu Google'}
             </Text>
           </Pressable>
           {!googleEnabled && (
@@ -196,6 +195,12 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     marginBottom: 8,
+    marginTop: 4,
+  },
+  stepLabel: {
+    color: '#94a3b8',
+    fontSize: 12,
+    fontWeight: '700',
     marginTop: 4,
   },
   authProviderRow: {

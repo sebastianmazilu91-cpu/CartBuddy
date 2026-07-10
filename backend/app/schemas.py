@@ -26,7 +26,7 @@ class LoginRequest(BaseModel):
 
 class GoogleLoginRequest(BaseModel):
     access_token: str = Field(min_length=20, max_length=4096)
-    phone: str = Field(min_length=7, max_length=20)
+    phone: str = Field(default="", max_length=20)
     address: str = Field(min_length=5, max_length=256)
     latitude: float = Field(ge=-90, le=90)
     longitude: float = Field(ge=-180, le=180)

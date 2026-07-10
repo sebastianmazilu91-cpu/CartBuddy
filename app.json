@@ -2,6 +2,7 @@
   "expo": {
     "name": "CartBuddy",
     "slug": "CartBuddy",
+    "scheme": "app.cartbuddy",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/play-store-icon-512.png",
