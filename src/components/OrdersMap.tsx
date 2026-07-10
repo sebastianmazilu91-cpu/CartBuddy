@@ -1,5 +1,5 @@
-import { Image, StyleSheet, Text, View } from 'react-native';
-import MapView, { Marker } from 'react-native-maps';
+import { Image, Platform, StyleSheet, Text, View } from 'react-native';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 
 import { formatDistance } from '../formatters';
 import { translate, type Language, type TranslationKey } from '../i18n';
@@ -71,7 +71,15 @@ export function OrdersMap({ language, orders, userLocation, radiusMeters }: Orde
         <Text style={styles.title}>{t('nearbyOrdersMap')}</Text>
         <Text style={styles.radiusText}>{formatDistance(radiusMeters)}</Text>
       </View>
-      <MapView style={styles.map} initialRegion={region} showsUserLocation showsMyLocationButton>
+      <MapView
+        style={styles.map}
+        provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
+        initialRegion={region}
+        showsUserLocation
+        showsMyLocationButton
+        showsCompass
+        toolbarEnabled
+      >
         {orders.map((order) => (
           <Marker
             key={order.id}

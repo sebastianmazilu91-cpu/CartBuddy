@@ -1330,12 +1330,6 @@ export default function App() {
                 selected={nearbyPlatformFilter === ALL_PLATFORMS}
                 onPress={() => setNearbyPlatformFilter(ALL_PLATFORMS)}
               />
-              <ChipButton
-                key={OTHER_PLATFORMS}
-                label={t('otherPlatforms')}
-                selected={nearbyPlatformFilter === OTHER_PLATFORMS}
-                onPress={() => setNearbyPlatformFilter(OTHER_PLATFORMS)}
-              />
               {platforms.map((platform) => (
                 <ChipButton
                   key={platform}
@@ -1344,6 +1338,12 @@ export default function App() {
                   onPress={() => setNearbyPlatformFilter(platform)}
                 />
               ))}
+              <ChipButton
+                key={OTHER_PLATFORMS}
+                label={t('otherPlatforms')}
+                selected={nearbyPlatformFilter === OTHER_PLATFORMS}
+                onPress={() => setNearbyPlatformFilter(OTHER_PLATFORMS)}
+              />
             </View>
 
             <Text style={styles.sectionTitle}>{t('searchRadius')}</Text>
