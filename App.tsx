@@ -201,7 +201,7 @@ export default function App() {
       googleExpoClientId ||
       googleWebClientId ||
       '000000000000-expo-placeholder.apps.googleusercontent.com',
-    redirectUri: 'app.cartbuddy:/oauthredirect',
+    redirectUri: Platform.OS === 'android' ? 'app.cartbuddy:/oauthredirect' : undefined,
     scopes: ['openid', 'profile', 'email'],
   });
 
