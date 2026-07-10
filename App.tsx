@@ -40,6 +40,7 @@ import {
   DEFAULT_PLATFORMS,
   MAX_PRODUCT_LINK_SLOTS,
   MIN_PEOPLE_OPTIONS,
+  OTHER_PLATFORMS,
   WAIT_DAYS_OPTIONS,
 } from './src/constants';
 import type {
@@ -61,6 +62,7 @@ import type {
 import { AuthSection } from './src/components/AuthSection';
 import { HomeSection } from './src/components/HomeSection';
 import { MyOrderCard, NearbyOrderCard } from './src/components/OrderCard';
+import { OrdersMap } from './src/components/OrdersMap';
 import { ChipButton } from './src/components/ChipButton';
 import { RadiusBarSelector } from './src/components/RadiusBarSelector';
 import { LANGUAGES, translate, type Language, type TranslationKey } from './src/i18n';
@@ -148,12 +150,14 @@ export default function App() {
   const [isProfileSaving, setIsProfileSaving] = useState(false);
 
   const [selectedPlatform, setSelectedPlatform] = useState<string>('Amazon');
+  const [customPlatformName, setCustomPlatformName] = useState('');
   const [selectedRadius, setSelectedRadius] = useState<number>(500);
   const [selectedMinPeople, setSelectedMinPeople] = useState<number>(2);
   const [selectedWaitDays, setSelectedWaitDays] = useState<number>(1);
 
   const [nearbyRadiusFilter, setNearbyRadiusFilter] = useState<number>(1000);
   const [nearbyPlatformFilter, setNearbyPlatformFilter] = useState<string>(ALL_PLATFORMS);
+  const [isNearbyMapOpen, setIsNearbyMapOpen] = useState(false);
 
   const [orders, setOrders] = useState<OrderItem[]>([]);
   const [myOrders, setMyOrders] = useState<OrderItem[]>([]);
@@ -433,18 +437,34 @@ export default function App() {
         longitude: String(myLocation.longitude),
         radius_meters: String(nearbyRadiusFilter),
       });
-      if (nearbyPlatformFilter !== ALL_PLATFORMS) {
+      if (nearbyPlatformFilter !== ALL_PLATFORMS && nearbyPlatformFilter !== OTHER_PLATFORMS) {
         params.set('platform', nearbyPlatformFilter);
       }
 
-      const result = await fetchJson<{ items: OrderItem[] }>(
-        `${API_BASE_URL}/orders/nearby?${params.toString()}`,
-        { headers: { ...authHeaders() } },
-      );
-      setOrders(result.items);
-      setJoinedOrderIds(new Set(result.items.filter((item) => item.join_state === 'joined').map((item) => item.id)));
+      let result: { items: OrderItem[] };
+      try {
+        result = await fetchJson<{ items: OrderItem[] }>(
+          `${API_BASE_URL}/orders/nearby?${params.toString()}`,
+          { headers: { ...authHeaders() } },
+        );
+      } catch (error) {
+        if (nearbyRadiusFilter < 5000) {
+          throw error;
+        }
+        params.set('radius_meters', '3000');
+        result = await fetchJson<{ items: OrderItem[] }>(
+          `${API_BASE_URL}/orders/nearby?${params.toString()}`,
+          { headers: { ...authHeaders() } },
+        );
+      }
+      const visibleItems =
+        nearbyPlatformFilter === OTHER_PLATFORMS
+          ? result.items.filter((item) => !platforms.includes(item.platform))
+          : result.items;
+      setOrders(visibleItems);
+      setJoinedOrderIds(new Set(visibleItems.filter((item) => item.join_state === 'joined').map((item) => item.id)));
       const reservedMap: Record<string, string> = {};
-      for (const item of result.items) {
+      for (const item of visibleItems) {
         if (item.join_state === 'reserved' && item.my_reservation_expires_at) {
           reservedMap[item.id] = item.my_reservation_expires_at;
         }
@@ -455,7 +475,7 @@ export default function App() {
     } finally {
       setIsLoadingOrders(false);
     }
-  }, [apiStatus, authHeaders, authToken, myLocation, nearbyPlatformFilter, nearbyRadiusFilter, t]);
+  }, [apiStatus, authHeaders, authToken, myLocation, nearbyPlatformFilter, nearbyRadiusFilter, platforms, t]);
 
   const loadMyOrders = useCallback(async () => {
     if (apiStatus !== 'online' || !authToken) {
@@ -722,13 +742,19 @@ export default function App() {
       Alert.alert('Backend/Auth', t('authRequired'));
       return;
     }
+    const platformForOrder =
+      selectedPlatform === OTHER_PLATFORMS ? customPlatformName.trim() : selectedPlatform;
+    if (!platformForOrder) {
+      Alert.alert(t('incompleteData'), t('customPlatformRequired'));
+      return;
+    }
 
     try {
       await fetchJson<OrderItem>(`${API_BASE_URL}/orders`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({
-          platform: selectedPlatform,
+          platform: platformForOrder,
           min_people: selectedMinPeople,
           max_wait_days: selectedWaitDays,
           latitude: myLocation.latitude,
@@ -736,7 +762,7 @@ export default function App() {
         }),
       });
       setActiveTab('nearby');
-      setNearbyPlatformFilter(selectedPlatform);
+      setNearbyPlatformFilter(selectedPlatform === OTHER_PLATFORMS ? OTHER_PLATFORMS : platformForOrder);
       setNearbyRadiusFilter(selectedRadius);
       await Promise.all([loadNearbyOrders(), loadMyOrders(), loadNotifications()]);
       Alert.alert(t('orderCreated'), t('orderPublished'));
@@ -1179,7 +1205,26 @@ export default function App() {
                   onPress={() => setSelectedPlatform(platform)}
                 />
               ))}
+              <ChipButton
+                key={OTHER_PLATFORMS}
+                label={t('otherPlatforms')}
+                selected={selectedPlatform === OTHER_PLATFORMS}
+                onPress={() => setSelectedPlatform(OTHER_PLATFORMS)}
+              />
             </View>
+            {selectedPlatform === OTHER_PLATFORMS && (
+              <>
+                <Text style={styles.profileLabel}>{t('customPlatform')}</Text>
+                <TextInput
+                  value={customPlatformName}
+                  onChangeText={setCustomPlatformName}
+                  placeholder={t('customPlatformPlaceholder')}
+                  placeholderTextColor="#94a3b8"
+                  style={styles.input}
+                  autoCapitalize="words"
+                />
+              </>
+            )}
 
             <Text style={styles.sectionTitle}>{t('waitPeriod')}</Text>
             <View style={styles.chipWrap}>
@@ -1243,9 +1288,15 @@ export default function App() {
             <View style={styles.chipWrap}>
               <ChipButton
                 key={ALL_PLATFORMS}
-                label={ALL_PLATFORMS}
+                label={t('allPlatforms')}
                 selected={nearbyPlatformFilter === ALL_PLATFORMS}
                 onPress={() => setNearbyPlatformFilter(ALL_PLATFORMS)}
+              />
+              <ChipButton
+                key={OTHER_PLATFORMS}
+                label={t('otherPlatforms')}
+                selected={nearbyPlatformFilter === OTHER_PLATFORMS}
+                onPress={() => setNearbyPlatformFilter(OTHER_PLATFORMS)}
               />
               {platforms.map((platform) => (
                 <ChipButton
@@ -1266,6 +1317,12 @@ export default function App() {
             <Pressable onPress={loadNearbyOrders} style={styles.refreshButton}>
               <Text style={styles.refreshButtonText}>{t('refresh')}</Text>
             </Pressable>
+            <Pressable
+              onPress={() => setIsNearbyMapOpen((value) => !value)}
+              style={styles.mapToggleButton}
+            >
+              <Text style={styles.mapToggleButtonText}>{isNearbyMapOpen ? t('showList') : t('openMap')}</Text>
+            </Pressable>
 
             <View style={styles.ordersSection}>
               {isLoadingOrders ? (
@@ -1274,6 +1331,13 @@ export default function App() {
                 <Text style={styles.emptyState}>
                   {t('noNearbyOrders')}
                 </Text>
+              ) : isNearbyMapOpen && myLocation ? (
+                <OrdersMap
+                  language={language}
+                  orders={orders}
+                  userLocation={myLocation}
+                  radiusMeters={nearbyRadiusFilter}
+                />
               ) : (
                 orders.map((order) => (
                   <NearbyOrderCard
@@ -1558,6 +1622,20 @@ const styles = StyleSheet.create({
   refreshButtonText: {
     color: '#d9f99d',
     fontWeight: '700',
+    fontSize: 13,
+  },
+  mapToggleButton: {
+    borderRadius: 10,
+    borderColor: '#38bdf8',
+    borderWidth: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    marginTop: 8,
+    backgroundColor: '#0f172a',
+  },
+  mapToggleButtonText: {
+    color: '#bae6fd',
+    fontWeight: '800',
     fontSize: 13,
   },
   ordersSection: {

@@ -10,6 +10,9 @@ export function formatDistance(distanceMeters: number): string {
 }
 
 export function labelRadius(radius: number): string {
+  if (radius >= 5000) {
+    return '5km+';
+  }
   return radius < 1000 ? `${radius}m` : `${radius / 1000}km`;
 }
 

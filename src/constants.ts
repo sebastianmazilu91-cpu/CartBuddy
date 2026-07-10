@@ -1,10 +1,11 @@
 import { Platform } from 'react-native';
 
 export const DEFAULT_PLATFORMS = ['Amazon', 'eMAG', 'Temu', 'AliExpress', 'SHEIN', 'Fashion Days'] as const;
-export const RADIUS_OPTIONS = [50, 100, 250, 500, 1000, 2000, 3000];
+export const RADIUS_OPTIONS = [50, 100, 250, 500, 1000, 2000, 3000, 5000];
 export const MIN_PEOPLE_OPTIONS = [2, 3, 4, 5, 6, 7, 8, 9, 10];
 export const WAIT_DAYS_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 export const ALL_PLATFORMS = 'Toate platformele';
+export const OTHER_PLATFORMS = '__other_platforms__';
 
 const DEFAULT_API_BASE_URL =
   Platform.OS === 'android' ? 'http://10.0.2.2:8000' : 'http://127.0.0.1:8000';

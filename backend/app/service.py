@@ -496,9 +496,6 @@ def list_nearby_orders(
     platform: str | None = None,
     user_name: str | None = None,
 ) -> list[OrderResponse]:
-    if platform is not None and platform not in PLATFORMS:
-        return []
-
     with get_connection(write=True) as connection:
         _cleanup_expired_reservations(connection)
         _mark_expired_orders(connection)

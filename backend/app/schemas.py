@@ -3,9 +3,9 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
-Platform = Literal["Amazon", "eMAG", "Temu", "AliExpress", "SHEIN", "Fashion Days"]
+Platform = str
 PLATFORMS: tuple[str, ...] = ("Amazon", "eMAG", "Temu", "AliExpress", "SHEIN", "Fashion Days")
 
 
@@ -55,11 +55,19 @@ class AuthResponse(BaseModel):
 
 
 class CreateOrderRequest(BaseModel):
-    platform: Platform
+    platform: Platform = Field(min_length=2, max_length=64)
     min_people: int = Field(ge=2, le=10)
     max_wait_days: int = Field(ge=1, le=10)
     latitude: float = Field(ge=-90, le=90)
     longitude: float = Field(ge=-180, le=180)
+
+    @field_validator("platform")
+    @classmethod
+    def clean_platform(cls, value: str) -> str:
+        normalized = " ".join(value.strip().split())
+        if len(normalized) < 2:
+            raise ValueError("Platform name is too short")
+        return normalized
 
 
 class OrderResponse(BaseModel):

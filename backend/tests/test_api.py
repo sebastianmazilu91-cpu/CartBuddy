@@ -70,12 +70,17 @@ def test_privacy_policy_page_is_public(client: TestClient) -> None:
     assert "CartBuddy - Politica de confidentialitate" in response.text
 
 
-def create_order(client: TestClient, auth_response: dict, min_people: int = 2) -> dict:
+def create_order(
+    client: TestClient,
+    auth_response: dict,
+    min_people: int = 2,
+    platform: str = "Amazon",
+) -> dict:
     response = client.post(
         "/orders",
         headers=auth_headers(auth_response),
         json={
-            "platform": "Amazon",
+            "platform": platform,
             "min_people": min_people,
             "max_wait_days": 1,
             "latitude": 44.4268,
@@ -143,6 +148,27 @@ def test_create_order_and_nearby(client: TestClient) -> None:
             "longitude": 26.1025,
             "radius_meters": 1000,
             "platform": "Amazon",
+        },
+    )
+    assert nearby_response.status_code == 200
+    nearby_ids = {item["id"] for item in nearby_response.json()["items"]}
+    assert order["id"] in nearby_ids
+
+
+def test_create_order_with_custom_platform(client: TestClient) -> None:
+    creator = register_user(client, "CustomPlatformOwner")
+    order = create_order(client, creator, platform="Zalando")
+
+    assert order["platform"] == "Zalando"
+
+    nearby_response = client.get(
+        "/orders/nearby",
+        headers=auth_headers(creator),
+        params={
+            "latitude": 44.4268,
+            "longitude": 26.1025,
+            "radius_meters": 1000,
+            "platform": "Zalando",
         },
     )
     assert nearby_response.status_code == 200

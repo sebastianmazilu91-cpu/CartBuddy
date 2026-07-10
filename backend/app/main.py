@@ -299,7 +299,7 @@ def get_nearby_orders(
     current_user: dict = Depends(require_user),
     latitude: float = Query(ge=-90, le=90),
     longitude: float = Query(ge=-180, le=180),
-    radius_meters: int = Query(default=1000, ge=50, le=3000),
+    radius_meters: int = Query(default=1000, ge=50, le=5000),
     platform: str | None = Query(default=None),
 ):
     return NearbyOrdersResponse(
