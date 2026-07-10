@@ -1,8 +1,7 @@
-export type Tab = 'home' | 'create' | 'nearby';
+export type Tab = 'home' | 'create' | 'nearby' | 'profile';
 export type Coordinate = { latitude: number; longitude: number };
 export type ApiStatus = 'checking' | 'online' | 'offline';
 export type AuthMode = 'login' | 'register';
-export type AuthProvider = 'email' | 'google';
 
 export type User = {
   id: string;

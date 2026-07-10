@@ -15,12 +15,19 @@ import {
   StyleSheet,
   StatusBar as NativeStatusBar,
   Text,
+  TextInput,
   useWindowDimensions,
   View,
 } from 'react-native';
 
 import { fetchJson } from './src/api';
-import { clearStoredAuthSession, getStoredAuthSession, saveAuthSession } from './src/authStorage';
+import {
+  clearStoredAuthSession,
+  getStoredAuthSession,
+  getStoredLanguagePreference,
+  saveAuthSession,
+  saveLanguagePreference,
+} from './src/authStorage';
 import {
   cacheOrderLinks,
   cacheOrderMessages,
@@ -31,7 +38,6 @@ import {
   ALL_PLATFORMS,
   API_BASE_URL,
   DEFAULT_PLATFORMS,
-  JOIN_RESERVATION_MINUTES,
   MAX_PRODUCT_LINK_SLOTS,
   MIN_PEOPLE_OPTIONS,
   WAIT_DAYS_OPTIONS,
@@ -39,7 +45,6 @@ import {
 import type {
   ApiStatus,
   AuthMode,
-  AuthProvider,
   AuthResponse,
   Coordinate,
   NotificationItem,
@@ -58,6 +63,7 @@ import { HomeSection } from './src/components/HomeSection';
 import { MyOrderCard, NearbyOrderCard } from './src/components/OrderCard';
 import { ChipButton } from './src/components/ChipButton';
 import { RadiusBarSelector } from './src/components/RadiusBarSelector';
+import { LANGUAGES, translate, type Language, type TranslationKey } from './src/i18n';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -119,6 +125,7 @@ export default function App() {
   const tabletWidthStyle = isTabletLayout ? styles.tabletWidth : null;
 
   const [activeTab, setActiveTab] = useState<Tab>('home');
+  const [language, setLanguage] = useState<Language>('ro');
   const [locationState, setLocationState] = useState<'loading' | 'granted' | 'fallback'>('loading');
   const [myLocation, setMyLocation] = useState<Coordinate | null>(null);
   const [detectedAddress, setDetectedAddress] = useState('');
@@ -131,12 +138,14 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isRestoringAuth, setIsRestoringAuth] = useState(true);
   const [authMode, setAuthMode] = useState<AuthMode>('login');
-  const [authProvider, setAuthProvider] = useState<AuthProvider>('email');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [phone, setPhone] = useState('');
   const [isAuthSubmitting, setIsAuthSubmitting] = useState(false);
+  const [profilePhone, setProfilePhone] = useState('');
+  const [profileAddress, setProfileAddress] = useState('');
+  const [isProfileSaving, setIsProfileSaving] = useState(false);
 
   const [selectedPlatform, setSelectedPlatform] = useState<string>('Amazon');
   const [selectedRadius, setSelectedRadius] = useState<number>(500);
@@ -205,6 +214,13 @@ export default function App() {
     scopes: ['openid', 'profile', 'email'],
   });
 
+  const t = useCallback((key: TranslationKey) => translate(language, key), [language]);
+
+  const changeLanguage = useCallback((nextLanguage: Language) => {
+    setLanguage(nextLanguage);
+    void saveLanguagePreference(nextLanguage);
+  }, []);
+
   const resetAuthState = useCallback(() => {
     setAuthToken(null);
     setCurrentUser(null);
@@ -228,10 +244,24 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (!currentUser) {
+      setProfilePhone('');
+      setProfileAddress('');
+      return;
+    }
+    setProfilePhone(currentUser.phone);
+    setProfileAddress(currentUser.address);
+  }, [currentUser]);
+
+  useEffect(() => {
     let cancelled = false;
 
     async function restoreAuthSession() {
       try {
+        const storedLanguage = await getStoredLanguagePreference();
+        if (!cancelled && storedLanguage) {
+          setLanguage(storedLanguage);
+        }
         const session = await getStoredAuthSession();
         if (cancelled || !session) {
           return;
@@ -421,11 +451,11 @@ export default function App() {
       }
       setReservedOrderExpiresById(reservedMap);
     } catch {
-      Alert.alert('Eroare', 'Nu am putut incarca comenzile din apropiere.');
+      Alert.alert(t('error'), t('loadNearbyFailed'));
     } finally {
       setIsLoadingOrders(false);
     }
-  }, [apiStatus, authHeaders, authToken, myLocation, nearbyPlatformFilter, nearbyRadiusFilter]);
+  }, [apiStatus, authHeaders, authToken, myLocation, nearbyPlatformFilter, nearbyRadiusFilter, t]);
 
   const loadMyOrders = useCallback(async () => {
     if (apiStatus !== 'online' || !authToken) {
@@ -439,11 +469,11 @@ export default function App() {
       });
       setMyOrders(result.items);
     } catch {
-      Alert.alert('Eroare', 'Nu am putut incarca comenzile tale.');
+      Alert.alert(t('error'), t('loadMineFailed'));
     } finally {
       setIsLoadingMyOrders(false);
     }
-  }, [apiStatus, authHeaders, authToken]);
+  }, [apiStatus, authHeaders, authToken, t]);
 
   const loadNotifications = useCallback(async () => {
     if (apiStatus !== 'online' || !authToken) {
@@ -515,23 +545,23 @@ export default function App() {
 
   async function submitEmailAuth() {
     if (apiStatus !== 'online') {
-      Alert.alert('Backend offline', 'Porneste backend-ul Python inainte de autentificare.');
+      Alert.alert(t('backendOffline'), t('backendBeforeAuth'));
       return;
     }
     if (!email.trim() || !password.trim()) {
-      Alert.alert('Date incomplete', 'Completeaza email si parola.');
+      Alert.alert(t('incompleteData'), t('emailPasswordRequired'));
       return;
     }
     if (authMode === 'register' && displayName.trim().length < 2) {
-      Alert.alert('Date incomplete', 'Alege un nume de minim 2 caractere.');
+      Alert.alert(t('incompleteData'), t('nameTooShort'));
       return;
     }
     if (authMode === 'register' && phone.trim().length < 7) {
-      Alert.alert('Date incomplete', 'Introdu numarul de telefon.');
+      Alert.alert(t('incompleteData'), t('phoneRequired'));
       return;
     }
     if (authMode === 'register' && !myLocation) {
-      Alert.alert('Locatie indisponibila', 'Nu am putut detecta geolocatia pentru adresa.');
+      Alert.alert(t('locationUnavailable'), t('geolocationRequired'));
       return;
     }
 
@@ -569,7 +599,7 @@ export default function App() {
       setDisplayName('');
       setPhone('');
     } catch (error) {
-      Alert.alert('Autentificare esuata', error instanceof Error ? error.message : 'Eroare necunoscuta');
+      Alert.alert(t('authFailed'), error instanceof Error ? error.message : t('unknownError'));
     } finally {
       setIsAuthSubmitting(false);
     }
@@ -578,11 +608,11 @@ export default function App() {
   const submitGoogleAuth = useCallback(
     async (accessToken: string) => {
       if (apiStatus !== 'online') {
-        Alert.alert('Backend offline', 'Porneste backend-ul Python inainte de autentificare.');
+        Alert.alert(t('backendOffline'), t('backendBeforeAuth'));
         return;
       }
       if (!myLocation) {
-        Alert.alert('Locatie indisponibila', 'Nu am putut detecta geolocatia pentru adresa.');
+        Alert.alert(t('locationUnavailable'), t('geolocationRequired'));
         return;
       }
       setIsAuthSubmitting(true);
@@ -603,12 +633,12 @@ export default function App() {
         setActiveTab('home');
         setPhone('');
       } catch (error) {
-        Alert.alert('Login Google esuat', error instanceof Error ? error.message : 'Eroare necunoscuta');
+        Alert.alert(t('googleLoginFailed'), error instanceof Error ? error.message : t('unknownError'));
       } finally {
         setIsAuthSubmitting(false);
       }
     },
-    [apiStatus, detectedAddress, myLocation],
+    [apiStatus, detectedAddress, myLocation, t],
   );
 
   useEffect(() => {
@@ -621,7 +651,7 @@ export default function App() {
         ? googleResponse.params.access_token
         : null);
     if (!accessToken) {
-      Alert.alert('Google', 'Nu am primit token de la Google.');
+      Alert.alert('Google', t('googleTokenMissing'));
       return;
     }
     void submitGoogleAuth(accessToken);
@@ -630,13 +660,13 @@ export default function App() {
   async function startGoogleLogin() {
     if (!googleEnabled) {
       Alert.alert(
-        'Google neconfigurat',
-        `Seteaza ${requiredGoogleEnvVar} pentru a activa login-ul Google pe aceasta platforma.`,
+        t('googleNotConfigured'),
+        `${t('googleConfigMessage')} (${requiredGoogleEnvVar})`,
       );
       return;
     }
     if (!googleRequest) {
-      Alert.alert('Google', 'Fluxul Google inca se initializeaza.');
+      Alert.alert('Google', t('googleInitializing'));
       return;
     }
     await promptGoogleAuth();
@@ -647,13 +677,49 @@ export default function App() {
     await clearStoredAuthSession();
   }
 
+  async function saveProfile() {
+    if (apiStatus !== 'online' || !authToken || !currentUser) {
+      Alert.alert('Backend/Auth', t('authRequired'));
+      return;
+    }
+    if (profilePhone.trim() && profilePhone.trim().length < 7) {
+      Alert.alert(t('profile'), t('phoneTooShort'));
+      return;
+    }
+    if (profileAddress.trim().length < 5) {
+      Alert.alert(t('profile'), t('addressTooShort'));
+      return;
+    }
+
+    setIsProfileSaving(true);
+    try {
+      const updatedUser = await fetchJson<User>(`${API_BASE_URL}/auth/me`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({
+          phone: profilePhone.trim(),
+          address: profileAddress.trim(),
+          latitude: myLocation?.latitude ?? currentUser.latitude,
+          longitude: myLocation?.longitude ?? currentUser.longitude,
+        }),
+      });
+      setCurrentUser(updatedUser);
+      await saveAuthSession(authToken, updatedUser);
+      Alert.alert(t('profile'), t('profileSaved'));
+    } catch (error) {
+      Alert.alert(t('profile'), error instanceof Error ? error.message : t('profileSaveFailed'));
+    } finally {
+      setIsProfileSaving(false);
+    }
+  }
+
   async function createOrder() {
     if (!myLocation) {
-      Alert.alert('Locatie indisponibila', 'Nu am inca o locatie valida.');
+      Alert.alert(t('locationUnavailable'), t('noValidLocation'));
       return;
     }
     if (apiStatus !== 'online' || !authToken) {
-      Alert.alert('Backend/Auth', 'Trebuie sa fii logat si backend-ul sa fie pornit.');
+      Alert.alert('Backend/Auth', t('authRequired'));
       return;
     }
 
@@ -673,9 +739,9 @@ export default function App() {
       setNearbyPlatformFilter(selectedPlatform);
       setNearbyRadiusFilter(selectedRadius);
       await Promise.all([loadNearbyOrders(), loadMyOrders(), loadNotifications()]);
-      Alert.alert('Comanda creata', 'Comanda ta a fost publicata.');
+      Alert.alert(t('orderCreated'), t('orderPublished'));
     } catch {
-      Alert.alert('Eroare', 'Nu am putut crea comanda.');
+      Alert.alert(t('error'), t('createOrderFailed'));
     }
   }
 
@@ -694,13 +760,13 @@ export default function App() {
       setNotifications(result.items);
       setUnreadNotificationsCount(result.unread_count);
     } catch {
-      Alert.alert('Notificari', 'Nu am putut marca notificarea ca citita.');
+      Alert.alert(t('notifications'), t('notificationsReadFailed'));
     }
   }
 
   async function joinOrder(orderId: string) {
     if (apiStatus !== 'online' || !authToken) {
-      Alert.alert('Backend/Auth', 'Trebuie sa fii logat si backend-ul sa fie pornit.');
+      Alert.alert('Backend/Auth', t('authRequired'));
       return;
     }
     if (joinedOrderIds.has(orderId)) {
@@ -719,10 +785,7 @@ export default function App() {
             [orderId]: result.my_reservation_expires_at as string,
           }));
         }
-        Alert.alert(
-          'Loc rezervat',
-          `Ai rezervat un loc pentru ${JOIN_RESERVATION_MINUTES} minute. Apasa inca o data pentru confirmare.`,
-        );
+        Alert.alert(t('spotReserved'), t('spotReservedMessage'));
         await loadNearbyOrders();
         return;
       }
@@ -745,11 +808,11 @@ export default function App() {
     } catch (error) {
       const message = error instanceof Error ? error.message : '';
       if (message.includes('Order is full')) {
-        Alert.alert('Comanda plina', 'Toate locurile din aceasta comanda sunt ocupate.');
+        Alert.alert(t('orderFull'), t('orderFullMessage'));
         await loadNearbyOrders();
         return;
       }
-      Alert.alert('Eroare', 'Nu am putut face join la comanda (poate a expirat).');
+      Alert.alert(t('error'), t('joinOrderFailed'));
     }
   }
 
@@ -770,7 +833,7 @@ export default function App() {
       setSlotsUsedByOrderId((previous) => ({ ...previous, [orderId]: result.slots_used }));
       await cacheOrderLinks(orderId, result.items);
     } catch {
-      Alert.alert('Linkuri', 'Nu am putut incarca linkurile pentru aceasta comanda.');
+      Alert.alert(t('links'), t('loadLinksFailed'));
     } finally {
       setLoadingLinksByOrderId((previous) => ({ ...previous, [orderId]: false }));
     }
@@ -779,12 +842,12 @@ export default function App() {
   async function addProductLink(orderId: string) {
     const draft = orderLinkDraftByOrderId[orderId]?.trim() ?? '';
     if (!draft) {
-      Alert.alert('Link lipsa', 'Introdu un link de produs.');
+      Alert.alert(t('missingLink'), t('enterProductLink'));
       return;
     }
     const currentSlotsUsed = slotsUsedByOrderId[orderId] ?? 0;
     if (currentSlotsUsed >= MAX_PRODUCT_LINK_SLOTS) {
-      Alert.alert('Limita atinsa', 'Poti adauga maximum 10 linkuri la aceasta comanda.');
+      Alert.alert(t('limitReached'), t('maxLinksReached'));
       return;
     }
 
@@ -802,14 +865,14 @@ export default function App() {
     } catch (error) {
       const message = error instanceof Error ? error.message : '';
       if (message.includes('Maximum 10 product link slots reached')) {
-        Alert.alert('Limita atinsa', 'Ai atins limita de 10 linkuri.');
+        Alert.alert(t('limitReached'), t('allSlotsReached'));
         return;
       }
       if (message.includes('Invalid product URL')) {
-        Alert.alert('URL invalid', 'Foloseste un link valid care incepe cu http:// sau https://');
+        Alert.alert(t('invalidUrl'), t('validHttpUrlRequired'));
         return;
       }
-      Alert.alert('Eroare', 'Nu am putut salva linkul produsului.');
+      Alert.alert(t('error'), t('saveLinkFailed'));
     }
   }
 
@@ -849,7 +912,7 @@ export default function App() {
       setOrderMessagesByOrderId((previous) => ({ ...previous, [orderId]: result.items }));
       await cacheOrderMessages(orderId, result.items);
     } catch {
-      Alert.alert('Chat', 'Nu am putut incarca mesajele pentru aceasta comanda.');
+      Alert.alert(t('chat'), t('loadChatFailed'));
     } finally {
       setLoadingMessagesByOrderId((previous) => ({ ...previous, [orderId]: false }));
     }
@@ -858,7 +921,7 @@ export default function App() {
   async function sendOrderMessage(orderId: string) {
     const draft = orderMessageDraftByOrderId[orderId]?.trim() ?? '';
     if (!draft) {
-      Alert.alert('Mesaj lipsa', 'Scrie un mesaj pentru chat.');
+      Alert.alert(t('missingMessage'), t('writeChatMessage'));
       return;
     }
 
@@ -873,7 +936,7 @@ export default function App() {
       await cacheOrderMessages(orderId, result.items);
       void loadNotifications();
     } catch {
-      Alert.alert('Chat', 'Nu am putut trimite mesajul.');
+      Alert.alert(t('chat'), t('sendChatFailed'));
     }
   }
 
@@ -901,7 +964,7 @@ export default function App() {
     try {
       await Linking.openURL(link.url);
     } catch {
-      Alert.alert('Link invalid', 'Nu am putut deschide linkul.');
+      Alert.alert(t('invalidLink'), t('openLinkFailed'));
       return;
     }
 
@@ -918,13 +981,13 @@ export default function App() {
       await cacheOrderLinks(orderId, result.items);
       void loadNotifications();
     } catch {
-      Alert.alert('Procesare', 'Nu am putut marca linkul ca procesat.');
+      Alert.alert(t('processingTitle'), t('processLinkFailed'));
     }
   }
 
   async function extendOrder(orderId: string) {
     if (apiStatus !== 'online' || !authToken) {
-      Alert.alert('Backend/Auth', 'Trebuie sa fii logat si backend-ul sa fie pornit.');
+      Alert.alert('Backend/Auth', t('authRequired'));
       return;
     }
 
@@ -934,15 +997,15 @@ export default function App() {
         headers: { ...authHeaders() },
       });
       await Promise.all([loadNearbyOrders(), loadMyOrders(), loadNotifications()]);
-      Alert.alert('Comanda prelungita', 'Comanda a fost prelungita o singura data cu 10 zile.');
+      Alert.alert(t('orderExtended'), t('orderExtendedMessage'));
     } catch {
-      Alert.alert('Nu se poate prelungi', 'Comanda trebuie sa fie expirata si neprelungita anterior.');
+      Alert.alert(t('cannotExtend'), t('cannotExtendMessage'));
     }
   }
 
   async function updateOrderStatus(orderId: string, status: OrderStatus) {
     if (apiStatus !== 'online' || !authToken) {
-      Alert.alert('Backend/Auth', 'Trebuie sa fii logat si backend-ul sa fie pornit.');
+      Alert.alert('Backend/Auth', t('authRequired'));
       return;
     }
 
@@ -954,7 +1017,7 @@ export default function App() {
       });
       await Promise.all([loadNearbyOrders(), loadMyOrders(), loadNotifications()]);
     } catch {
-      Alert.alert('Status', 'Nu am putut actualiza statusul comenzii.');
+      Alert.alert(t('status'), t('statusUpdateFailed'));
     }
   }
 
@@ -962,17 +1025,27 @@ export default function App() {
     <SafeAreaView style={[styles.screen, styles.androidStatusBarInset]}>
       <ExpoStatusBar style="light" />
       <View style={[styles.header, tabletWidthStyle]}>
-        <Text style={styles.title}>CartBuddy</Text>
-        <Text style={styles.subtitle}>Comenzi comune locale pentru cost mai mic la livrare.</Text>
+        <View style={styles.headerTitleRow}>
+          <Text style={styles.title}>CartBuddy</Text>
+          <Pressable
+            onPress={() => changeLanguage(language === 'ro' ? 'en' : 'ro')}
+            style={styles.headerLanguageButton}
+          >
+            <Text style={styles.headerLanguageText}>
+              {language.toUpperCase()} {'\u{1F310}'}
+            </Text>
+          </Pressable>
+        </View>
+        <Text style={styles.subtitle}>{t('commonOrdersSubtitle')}</Text>
       </View>
 
       {currentUser && (
         <View style={[styles.userRow, tabletWidthStyle]}>
-          <Text style={styles.userText}>Logat: {currentUser.display_name}</Text>
+          <Text style={styles.userText}>{t('loggedIn')}: {currentUser.display_name}</Text>
           <View style={styles.userActionsRow}>
             <Text style={styles.headerNotifBadge}>{unreadNotificationsCount} notif</Text>
             <Pressable onPress={logout} style={styles.logoutButton}>
-              <Text style={styles.logoutButtonText}>Logout</Text>
+              <Text style={styles.logoutButtonText}>{t('logout')}</Text>
             </Pressable>
           </View>
         </View>
@@ -981,7 +1054,7 @@ export default function App() {
       {activeTab !== 'home' && currentUser && (
         <View style={[styles.topNav, tabletWidthStyle]}>
           <Pressable onPress={() => setActiveTab('home')} style={styles.backButton}>
-            <Text style={styles.backButtonText}>Inapoi la Home</Text>
+            <Text style={styles.backButtonText}>{t('backHome')}</Text>
           </Pressable>
         </View>
       )}
@@ -989,14 +1062,14 @@ export default function App() {
       {locationState === 'loading' && (
         <View style={[styles.locationNotice, tabletWidthStyle]}>
           <ActivityIndicator color="#84cc16" />
-          <Text style={styles.noticeText}>Determin locatia...</Text>
+          <Text style={styles.noticeText}>{t('detectingLocation')}</Text>
         </View>
       )}
 
       {locationState === 'fallback' && (
         <View style={[styles.locationWarning, tabletWidthStyle]}>
           <Text style={styles.warningText}>
-            Folosesc locatie demo (Bucuresti) deoarece permisiunea GPS lipseste.
+            {t('fallbackLocation')}
           </Text>
         </View>
       )}
@@ -1005,12 +1078,11 @@ export default function App() {
         {isRestoringAuth ? (
           <View style={styles.authCard}>
             <ActivityIndicator color="#84cc16" />
-            <Text style={styles.emptyState}>Refac sesiunea...</Text>
+            <Text style={styles.emptyState}>{t('restoringSession')}</Text>
           </View>
         ) : !currentUser ? (
           <AuthSection
-            authProvider={authProvider}
-            onAuthProviderChange={setAuthProvider}
+            language={language}
             authMode={authMode}
             onAuthModeChange={setAuthMode}
             displayName={displayName}
@@ -1032,17 +1104,72 @@ export default function App() {
           />
         ) : activeTab === 'home' ? (
           <HomeSection
+            language={language}
             unreadNotificationsCount={unreadNotificationsCount}
             notifications={notifications}
             isLoadingNotifications={isLoadingNotifications}
             onOpenNearby={() => setActiveTab('nearby')}
             onOpenCreate={() => setActiveTab('create')}
+            onOpenProfile={() => setActiveTab('profile')}
             onRefreshNotifications={loadNotifications}
             onMarkNotificationRead={markNotificationRead}
           />
+        ) : activeTab === 'profile' ? (
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>{t('profile')}</Text>
+            <Text style={styles.profileLabel}>{t('language')}</Text>
+            <View style={styles.chipWrap}>
+              {LANGUAGES.map((item) => (
+                <ChipButton
+                  key={item.value}
+                  label={item.label}
+                  selected={language === item.value}
+                  onPress={() => changeLanguage(item.value)}
+                />
+              ))}
+            </View>
+            <View style={styles.profileInfoBox}>
+              <Text style={styles.profileLabel}>{t('email')}</Text>
+              <Text style={styles.profileValue}>{currentUser.email}</Text>
+            </View>
+            <View style={styles.profileInfoBox}>
+              <Text style={styles.profileLabel}>{t('displayName')}</Text>
+              <Text style={styles.profileValue}>{currentUser.display_name}</Text>
+            </View>
+            <Text style={styles.profileLabel}>{t('phoneNumber')}</Text>
+            <TextInput
+              value={profilePhone}
+              onChangeText={setProfilePhone}
+              placeholder={t('addPhone')}
+              placeholderTextColor="#94a3b8"
+              style={styles.input}
+              keyboardType="phone-pad"
+            />
+            <Text style={styles.profileLabel}>{t('address')}</Text>
+            <TextInput
+              value={profileAddress}
+              onChangeText={setProfileAddress}
+              placeholder={t('mainAddress')}
+              placeholderTextColor="#94a3b8"
+              style={[styles.input, styles.multilineInput]}
+              multiline
+            />
+            <Text style={styles.smallNote}>
+              {t('profileGpsNote')}
+            </Text>
+            <Pressable
+              onPress={saveProfile}
+              style={[styles.primaryButton, isProfileSaving && styles.disabledButton]}
+              disabled={isProfileSaving}
+            >
+              <Text style={styles.primaryButtonText}>
+                {isProfileSaving ? t('saving') : t('saveProfile')}
+              </Text>
+            </Pressable>
+          </View>
         ) : activeTab === 'create' ? (
           <View style={styles.card}>
-            <Text style={styles.sectionTitle}>1) Alege platforma</Text>
+            <Text style={styles.sectionTitle}>{t('choosePlatform')}</Text>
             <View style={styles.chipWrap}>
               {platforms.map((platform) => (
                 <ChipButton
@@ -1054,7 +1181,7 @@ export default function App() {
               ))}
             </View>
 
-            <Text style={styles.sectionTitle}>2) Perioada maxima de asteptare (1-10 zile)</Text>
+            <Text style={styles.sectionTitle}>{t('waitPeriod')}</Text>
             <View style={styles.chipWrap}>
               {WAIT_DAYS_OPTIONS.map((days) => (
                 <ChipButton
@@ -1066,7 +1193,7 @@ export default function App() {
               ))}
             </View>
 
-            <Text style={styles.sectionTitle}>3) Numar minim buddy (2-10)</Text>
+            <Text style={styles.sectionTitle}>{t('minBuddy')}</Text>
             <View style={styles.chipWrap}>
               {MIN_PEOPLE_OPTIONS.map((people) => (
                 <ChipButton
@@ -1078,29 +1205,30 @@ export default function App() {
               ))}
             </View>
 
-            <Text style={styles.sectionTitle}>4) Raza recomandata pentru matching</Text>
-            <RadiusBarSelector value={selectedRadius} onChange={setSelectedRadius} />
+            <Text style={styles.sectionTitle}>{t('matchingRadius')}</Text>
+            <RadiusBarSelector language={language} value={selectedRadius} onChange={setSelectedRadius} />
 
             <Pressable onPress={createOrder} style={styles.primaryButton}>
-              <Text style={styles.primaryButtonText}>Publica comanda</Text>
+              <Text style={styles.primaryButtonText}>{t('publishOrder')}</Text>
             </Pressable>
 
             <View style={styles.myOrdersHeader}>
-              <Text style={styles.sectionTitle}>Comenzile mele</Text>
+              <Text style={styles.sectionTitle}>{t('myOrders')}</Text>
               <Pressable onPress={loadMyOrders}>
-                <Text style={styles.inlineAction}>Refresh</Text>
+                <Text style={styles.inlineAction}>{t('refresh')}</Text>
               </Pressable>
             </View>
 
             {isLoadingMyOrders ? (
               <ActivityIndicator color="#84cc16" />
             ) : myOrders.length === 0 ? (
-              <Text style={styles.emptyState}>Nu ai comenzi create momentan.</Text>
+              <Text style={styles.emptyState}>{t('noMyOrders')}</Text>
             ) : (
               <View style={styles.ordersSection}>
                 {myOrders.map((order) => (
                   <MyOrderCard
                     key={order.id}
+                    language={language}
                     order={order}
                     onExtend={extendOrder}
                     onStatusChange={updateOrderStatus}
@@ -1111,7 +1239,7 @@ export default function App() {
           </View>
         ) : (
           <View style={styles.card}>
-            <Text style={styles.sectionTitle}>Filtre</Text>
+            <Text style={styles.sectionTitle}>{t('filters')}</Text>
             <View style={styles.chipWrap}>
               <ChipButton
                 key={ALL_PLATFORMS}
@@ -1129,14 +1257,14 @@ export default function App() {
               ))}
             </View>
 
-            <Text style={styles.sectionTitle}>Raza cautare</Text>
-            <RadiusBarSelector value={nearbyRadiusFilter} onChange={setNearbyRadiusFilter} />
+            <Text style={styles.sectionTitle}>{t('searchRadius')}</Text>
+            <RadiusBarSelector language={language} value={nearbyRadiusFilter} onChange={setNearbyRadiusFilter} />
             <Text style={styles.smallNote}>
-              Sortare inteligenta activa: distanta + locuri disponibile + timp ramas.
+              {t('smartSorting')}
             </Text>
 
             <Pressable onPress={loadNearbyOrders} style={styles.refreshButton}>
-              <Text style={styles.refreshButtonText}>Refresh</Text>
+              <Text style={styles.refreshButtonText}>{t('refresh')}</Text>
             </Pressable>
 
             <View style={styles.ordersSection}>
@@ -1144,12 +1272,13 @@ export default function App() {
                 <ActivityIndicator color="#84cc16" />
               ) : orders.length === 0 ? (
                 <Text style={styles.emptyState}>
-                  Nu exista comenzi in raza selectata sau comenzile au expirat.
+                  {t('noNearbyOrders')}
                 </Text>
               ) : (
                 orders.map((order) => (
                   <NearbyOrderCard
                     key={order.id}
+                    language={language}
                     order={order}
                     currentUserName={currentUser.display_name}
                     isJoined={joinedOrderIds.has(order.id) || order.join_state === 'joined'}
@@ -1211,10 +1340,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingBottom: 10,
   },
+  headerTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
   title: {
     color: '#f8fafc',
     fontSize: 28,
     fontWeight: '700',
+  },
+  headerLanguageButton: {
+    borderWidth: 1,
+    borderColor: '#334155',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: '#111827',
+  },
+  headerLanguageText: {
+    color: '#e2e8f0',
+    fontSize: 12,
+    fontWeight: '800',
   },
   subtitle: {
     color: '#cbd5e1',
@@ -1347,10 +1495,46 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     alignItems: 'center',
   },
+  disabledButton: {
+    opacity: 0.6,
+  },
   primaryButtonText: {
     color: '#132b02',
     fontWeight: '800',
     fontSize: 15,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#475569',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: '#f8fafc',
+    backgroundColor: '#0b1220',
+    fontSize: 14,
+  },
+  multilineInput: {
+    minHeight: 76,
+    textAlignVertical: 'top',
+  },
+  profileInfoBox: {
+    borderWidth: 1,
+    borderColor: '#334155',
+    borderRadius: 10,
+    padding: 10,
+    backgroundColor: '#0b1220',
+    gap: 3,
+    marginBottom: 8,
+  },
+  profileLabel: {
+    color: '#cbd5e1',
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 6,
+  },
+  profileValue: {
+    color: '#f8fafc',
+    fontSize: 14,
   },
   myOrdersHeader: {
     marginTop: 8,

@@ -103,6 +103,30 @@ def test_register_login_and_me(client: TestClient) -> None:
     assert login_payload["user"]["email"] == registered["user"]["email"]
 
 
+def test_update_profile_phone_and_address(client: TestClient) -> None:
+    registered = register_user(client, "ProfileUser")
+
+    response = client.patch(
+        "/auth/me",
+        headers=auth_headers(registered),
+        json={
+            "phone": "+40744123456",
+            "address": "Strada Academiei 1, Bucuresti",
+            "latitude": 44.4355,
+            "longitude": 26.1018,
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["email"] == registered["user"]["email"]
+    assert payload["display_name"] == "ProfileUser"
+    assert payload["phone"] == "+40744123456"
+    assert payload["address"] == "Strada Academiei 1, Bucuresti"
+    assert payload["latitude"] == 44.4355
+    assert payload["longitude"] == 26.1018
+
+
 def test_create_order_and_nearby(client: TestClient) -> None:
     creator = register_user(client, "Creator")
     order = create_order(client, creator, min_people=3)

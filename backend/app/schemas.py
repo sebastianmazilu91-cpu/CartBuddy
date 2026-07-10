@@ -42,6 +42,13 @@ class UserResponse(BaseModel):
     longitude: float
 
 
+class UpdateProfileRequest(BaseModel):
+    phone: str = Field(default="", max_length=20)
+    address: str = Field(min_length=5, max_length=256)
+    latitude: float = Field(ge=-90, le=90)
+    longitude: float = Field(ge=-180, le=180)
+
+
 class AuthResponse(BaseModel):
     token: str
     user: UserResponse

@@ -6,7 +6,7 @@ from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 
-from .auth import create_user, login_user, login_with_google, require_user
+from .auth import create_user, login_user, login_with_google, require_user, update_user_profile
 from .db import init_db
 from .schemas import (
     AddOrderLinkRequest,
@@ -24,6 +24,7 @@ from .schemas import (
     RegisterPushTokenRequest,
     RegisterRequest,
     UpdateOrderStatusRequest,
+    UpdateProfileRequest,
     UserResponse,
 )
 from .service import (
@@ -264,6 +265,18 @@ def auth_google(payload: GoogleLoginRequest) -> AuthResponse:
 @app.get("/auth/me", response_model=UserResponse)
 def auth_me(current_user: dict = Depends(require_user)) -> UserResponse:
     return UserResponse(**current_user)
+
+
+@app.patch("/auth/me", response_model=UserResponse)
+def patch_auth_me(payload: UpdateProfileRequest, current_user: dict = Depends(require_user)) -> UserResponse:
+    user = update_user_profile(
+        user_id=current_user["id"],
+        phone=payload.phone,
+        address=payload.address,
+        latitude=payload.latitude,
+        longitude=payload.longitude,
+    )
+    return UserResponse(**user)
 
 
 @app.post("/push-tokens")

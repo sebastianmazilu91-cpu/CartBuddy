@@ -2,13 +2,15 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { RADIUS_OPTIONS } from '../constants';
 import { formatDistance, labelRadius } from '../formatters';
+import { translate, type Language } from '../i18n';
 
 type RadiusBarSelectorProps = {
+  language: Language;
   value: number;
   onChange: (value: number) => void;
 };
 
-export function RadiusBarSelector({ value, onChange }: RadiusBarSelectorProps) {
+export function RadiusBarSelector({ language, value, onChange }: RadiusBarSelectorProps) {
   const selectedIndex = Math.max(RADIUS_OPTIONS.indexOf(value), 0);
   const progressPercent =
     RADIUS_OPTIONS.length <= 1 ? 100 : (selectedIndex / (RADIUS_OPTIONS.length - 1)) * 100;
@@ -42,7 +44,9 @@ export function RadiusBarSelector({ value, onChange }: RadiusBarSelectorProps) {
           })}
         </View>
       </View>
-      <Text style={styles.radiusValueText}>Selectat: {formatDistance(value)}</Text>
+      <Text style={styles.radiusValueText}>
+        {translate(language, 'selected')}: {formatDistance(value)}
+      </Text>
     </View>
   );
 }

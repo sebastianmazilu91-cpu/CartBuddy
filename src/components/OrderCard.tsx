@@ -8,48 +8,51 @@ import {
   statusLabel,
   timeLeftLabel,
 } from '../formatters';
+import { translate, type Language, type TranslationKey } from '../i18n';
 import type { OrderItem, OrderMessageItem, OrderStatus, ProductLinkItem } from '../types';
 
 type MyOrderCardProps = {
+  language: Language;
   order: OrderItem;
   onExtend: (orderId: string) => void;
   onStatusChange: (orderId: string, status: OrderStatus) => void;
 };
 
-export function MyOrderCard({ order, onExtend, onStatusChange }: MyOrderCardProps) {
+export function MyOrderCard({ language, order, onExtend, onStatusChange }: MyOrderCardProps) {
+  const t = (key: TranslationKey) => translate(language, key);
   const canExtend = order.status === 'expired' && !order.extended_once;
   const canUpdateStatus = !['delivered', 'cancelled'].includes(order.status);
 
   return (
     <View style={styles.orderCard}>
       <Text style={styles.orderTitle}>{order.platform}</Text>
-      <Text style={styles.orderMeta}>Status: {statusLabel(order.status)}</Text>
+      <Text style={styles.orderMeta}>{t('status')}: {statusLabel(order.status, language)}</Text>
       <Text style={styles.orderMeta}>
-        Participanti: {order.current_people}/{order.min_people}
+        {t('participants')}: {order.current_people}/{order.min_people}
       </Text>
-      <Text style={styles.orderMeta}>Interval: {order.max_wait_days} zile</Text>
-      <Text style={styles.orderMeta}>Timp ramas: {timeLeftLabel(order.expires_at)}</Text>
-      <Text style={styles.orderMeta}>Prelungire folosita: {order.extended_once ? 'Da' : 'Nu'}</Text>
+      <Text style={styles.orderMeta}>{t('interval')}: {order.max_wait_days} {t('days')}</Text>
+      <Text style={styles.orderMeta}>{t('timeLeft')}: {timeLeftLabel(order.expires_at, language)}</Text>
+      <Text style={styles.orderMeta}>{t('extensionUsed')}: {order.extended_once ? t('yes') : t('no')}</Text>
 
       {canExtend && (
         <Pressable onPress={() => onExtend(order.id)} style={styles.secondaryButton}>
-          <Text style={styles.secondaryButtonText}>Prelungeste cu 10 zile</Text>
+          <Text style={styles.secondaryButtonText}>{t('extend10Days')}</Text>
         </Pressable>
       )}
 
       {canUpdateStatus && (
         <View style={styles.statusActionsRow}>
           <Pressable onPress={() => onStatusChange(order.id, 'ready_to_order')} style={styles.smallStatusButton}>
-            <Text style={styles.smallStatusButtonText}>Gata</Text>
+            <Text style={styles.smallStatusButtonText}>{t('ready')}</Text>
           </Pressable>
           <Pressable onPress={() => onStatusChange(order.id, 'ordered')} style={styles.smallStatusButton}>
-            <Text style={styles.smallStatusButtonText}>Comandata</Text>
+            <Text style={styles.smallStatusButtonText}>{t('ordered')}</Text>
           </Pressable>
           <Pressable onPress={() => onStatusChange(order.id, 'delivered')} style={styles.smallStatusButton}>
-            <Text style={styles.smallStatusButtonText}>Livrata</Text>
+            <Text style={styles.smallStatusButtonText}>{t('delivered')}</Text>
           </Pressable>
           <Pressable onPress={() => onStatusChange(order.id, 'cancelled')} style={styles.smallDangerButton}>
-            <Text style={styles.smallDangerButtonText}>Anuleaza</Text>
+            <Text style={styles.smallDangerButtonText}>{t('cancel')}</Text>
           </Pressable>
         </View>
       )}
@@ -58,6 +61,7 @@ export function MyOrderCard({ order, onExtend, onStatusChange }: MyOrderCardProp
 }
 
 type NearbyOrderCardProps = {
+  language: Language;
   order: OrderItem;
   currentUserName: string;
   isJoined: boolean;
@@ -83,6 +87,7 @@ type NearbyOrderCardProps = {
 };
 
 export function NearbyOrderCard({
+  language,
   order,
   currentUserName,
   isJoined,
@@ -106,6 +111,7 @@ export function NearbyOrderCard({
   onMessageDraftChange,
   onSendMessage,
 }: NearbyOrderCardProps) {
+  const t = (key: TranslationKey) => translate(language, key);
   const effectivePeople = order.current_people + order.reserved_people;
   const reachedMin = effectivePeople >= order.min_people;
   const isOwnOrder = currentUserName === order.created_by;
@@ -127,23 +133,25 @@ export function NearbyOrderCard({
   return (
     <View style={styles.orderCard}>
       <Text style={styles.orderTitle}>{order.platform}</Text>
-      <Text style={styles.orderMeta}>Initiata de: {order.created_by}</Text>
-      {matchPercent !== null && <Text style={styles.orderMeta}>Scor matching: {matchPercent}%</Text>}
+      <Text style={styles.orderMeta}>{t('initiatedBy')}: {order.created_by}</Text>
+      {matchPercent !== null && <Text style={styles.orderMeta}>{t('matchScore')}: {matchPercent}%</Text>}
       <Text style={styles.orderMeta}>
-        Distanta: {order.distance_meters === null ? '-' : formatDistance(order.distance_meters)}
+        {t('distance')}: {order.distance_meters === null ? '-' : formatDistance(order.distance_meters)}
       </Text>
       <Text style={styles.orderMeta}>
-        Participanti confirmati: {order.current_people}/{order.min_people}
+        {t('confirmedParticipants')}: {order.current_people}/{order.min_people}
       </Text>
-      <Text style={styles.orderMeta}>Rezervari active: {order.reserved_people}</Text>
-      <Text style={styles.orderMeta}>Locuri disponibile: {order.available_slots}</Text>
-      <Text style={styles.orderMeta}>Timp ramas: {timeLeftLabel(order.expires_at)}</Text>
+      <Text style={styles.orderMeta}>{t('activeReservations')}: {order.reserved_people}</Text>
+      <Text style={styles.orderMeta}>{t('availableSlots')}: {order.available_slots}</Text>
+      <Text style={styles.orderMeta}>{t('timeLeft')}: {timeLeftLabel(order.expires_at, language)}</Text>
       {isReserved && (
-        <Text style={styles.orderMeta}>Locul tau este rezervat: {reservationTimeLeftLabel(reservationExpiresAt)}</Text>
+        <Text style={styles.orderMeta}>
+          {t('reservedSpot')}: {reservationTimeLeftLabel(reservationExpiresAt, language)}
+        </Text>
       )}
 
       <Text style={[styles.statusTag, reachedMin ? styles.statusOk : styles.statusWait]}>
-        {reachedMin ? 'Pragul minim este atins' : 'Inca se cauta participanti'}
+        {reachedMin ? t('minReached') : t('lookingForMembers')}
       </Text>
 
       <Pressable
@@ -153,16 +161,16 @@ export function NearbyOrderCard({
       >
         <Text style={styles.secondaryButtonText}>
           {isOwnOrder
-            ? 'Comanda ta'
+            ? t('yourOrder')
             : isJoined
-              ? 'Te-ai alaturat'
+              ? t('joined')
               : isReserved
-                ? `Confirma in ${reservationTimeLeftLabel(reservationExpiresAt)}`
+                ? `${t('confirmIn')} ${reservationTimeLeftLabel(reservationExpiresAt, language)}`
                 : order.status !== 'open'
-                  ? 'Comanda nu mai accepta membri'
+                  ? t('noLongerAccepting')
                   : isOrderFull
-                  ? 'Nu mai sunt locuri'
-                  : `Rezerva loc (${JOIN_RESERVATION_MINUTES} min)`}
+                  ? t('noSlots')
+                  : `${t('reserveSpot')} (${JOIN_RESERVATION_MINUTES} min)`}
         </Text>
       </Pressable>
 
@@ -170,22 +178,22 @@ export function NearbyOrderCard({
         <View style={styles.panelCard}>
           <Pressable onPress={() => onToggleChat(order.id)} style={styles.panelToggleButton}>
             <Text style={styles.panelToggleText}>
-              {isChatOpen ? 'Ascunde chat' : 'Chat comanda'}
+              {isChatOpen ? t('hideChat') : t('orderChat')}
             </Text>
           </Pressable>
 
           {isChatOpen && (
             <View style={styles.panelBody}>
               <View style={styles.chatHeaderRow}>
-                <Text style={styles.chatHeaderText}>Mesaje</Text>
+                <Text style={styles.chatHeaderText}>{t('messages')}</Text>
                 <Pressable onPress={() => onRefreshMessages(order.id)}>
-                  <Text style={styles.inlineAction}>Refresh</Text>
+                  <Text style={styles.inlineAction}>{t('refresh')}</Text>
                 </Pressable>
               </View>
               {isLoadingMessages ? (
                 <ActivityIndicator color="#84cc16" />
               ) : messages.length === 0 ? (
-                <Text style={styles.emptyState}>Nu exista mesaje inca.</Text>
+                <Text style={styles.emptyState}>{t('noMessages')}</Text>
               ) : (
                 messages.map((message) => {
                   const isMine = message.user_name === currentUserName;
@@ -193,7 +201,7 @@ export function NearbyOrderCard({
                     <View key={message.id} style={[styles.messageBubble, isMine && styles.messageBubbleMine]}>
                       <Text style={styles.messageAuthor}>{message.user_name}</Text>
                       <Text style={styles.messageText}>{message.message}</Text>
-                      <Text style={styles.messageTime}>{notificationTimeLabel(message.created_at)}</Text>
+                      <Text style={styles.messageTime}>{notificationTimeLabel(message.created_at, language)}</Text>
                     </View>
                   );
                 })
@@ -203,17 +211,17 @@ export function NearbyOrderCard({
                   <TextInput
                     value={messageDraft}
                     onChangeText={(value) => onMessageDraftChange(order.id, value)}
-                    placeholder="Scrie un mesaj..."
+                    placeholder={t('writeMessage')}
                     placeholderTextColor="#94a3b8"
                     style={styles.input}
                     multiline
                   />
                   <Pressable onPress={() => onSendMessage(order.id)} style={styles.secondaryButton}>
-                    <Text style={styles.secondaryButtonText}>Trimite mesaj</Text>
+                    <Text style={styles.secondaryButtonText}>{t('sendMessage')}</Text>
                   </Pressable>
                 </>
               ) : (
-                <Text style={styles.emptyState}>Chatul este read-only pentru comenzi finalizate.</Text>
+                <Text style={styles.emptyState}>{t('readonlyChat')}</Text>
               )}
             </View>
           )}
@@ -224,19 +232,19 @@ export function NearbyOrderCard({
         <View style={styles.panelCard}>
           <Pressable onPress={() => onToggleLinks(order.id)} style={styles.panelToggleButton}>
             <Text style={styles.panelToggleText}>
-              {isLinksOpen ? 'Ascunde linkuri' : 'Gestioneaza linkuri produse'}
+              {isLinksOpen ? t('hideLinks') : t('manageProductLinks')}
             </Text>
           </Pressable>
 
           {isLinksOpen && (
             <View style={styles.panelBody}>
               <Text style={styles.orderMeta}>
-                Sloturi folosite: {slotsUsed}/{MAX_PRODUCT_LINK_SLOTS}
+                {t('usedSlots')}: {slotsUsed}/{MAX_PRODUCT_LINK_SLOTS}
               </Text>
               {isLoadingLinks ? (
                 <ActivityIndicator color="#84cc16" />
               ) : links.length === 0 ? (
-                <Text style={styles.emptyState}>Nu ai adaugat linkuri inca. Ai un slot disponibil acum.</Text>
+                <Text style={styles.emptyState}>{t('noLinksYet')}</Text>
               ) : (
                 links.map((link, idx) => (
                   <View key={link.id} style={styles.linkItemRow}>
@@ -251,12 +259,12 @@ export function NearbyOrderCard({
                             link.processed ? styles.linkStatusProcessed : styles.linkStatusPending,
                           ]}
                         >
-                          <Text style={styles.linkStatusText}>{link.processed ? 'In cos' : 'De verificat'}</Text>
+                          <Text style={styles.linkStatusText}>{link.processed ? t('inCart') : t('needsReview')}</Text>
                         </View>
                         <Text style={styles.linkMetaText}>
                           {link.processed
-                            ? `Procesat${link.processed_by ? ` de ${link.processed_by}` : ''}`
-                            : 'Asteapta procesare'}
+                            ? `${t('processed')}${link.processed_by ? ` ${t('processedBy').toLowerCase()} ${link.processed_by}` : ''}`
+                            : t('waitsProcessing')}
                         </Text>
                       </View>
                     </View>
@@ -270,23 +278,23 @@ export function NearbyOrderCard({
               )}
 
               {!canAddLinks ? (
-                <Text style={styles.emptyState}>Linkurile sunt read-only dupa plasarea comenzii.</Text>
+                <Text style={styles.emptyState}>{t('readonlyLinks')}</Text>
               ) : slotsLeftForLinks > 0 ? (
                 <>
                   <TextInput
                     value={linkDraft}
                     onChangeText={(value) => onLinkDraftChange(order.id, value)}
-                    placeholder="https://... link produs"
+                    placeholder={t('productLinkPlaceholder')}
                     placeholderTextColor="#94a3b8"
                     style={styles.input}
                     autoCapitalize="none"
                   />
                   <Pressable onPress={() => onAddProductLink(order.id)} style={styles.secondaryButton}>
-                    <Text style={styles.secondaryButtonText}>Adauga slot/link produs</Text>
+                    <Text style={styles.secondaryButtonText}>{t('addProductLink')}</Text>
                   </Pressable>
                 </>
               ) : (
-                <Text style={styles.emptyState}>Ai folosit toate cele 10 sloturi de linkuri.</Text>
+                <Text style={styles.emptyState}>{t('allLinkSlotsUsed')}</Text>
               )}
             </View>
           )}

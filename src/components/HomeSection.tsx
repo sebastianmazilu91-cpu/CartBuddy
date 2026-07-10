@@ -1,54 +1,67 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { notificationTimeLabel } from '../formatters';
+import { translate, type Language, type TranslationKey } from '../i18n';
 import type { NotificationItem } from '../types';
 
 type HomeSectionProps = {
+  language: Language;
   unreadNotificationsCount: number;
   notifications: NotificationItem[];
   isLoadingNotifications: boolean;
   onOpenNearby: () => void;
   onOpenCreate: () => void;
+  onOpenProfile: () => void;
   onRefreshNotifications: () => void;
   onMarkNotificationRead: (notificationId: string) => void;
 };
 
 export function HomeSection({
+  language,
   unreadNotificationsCount,
   notifications,
   isLoadingNotifications,
   onOpenNearby,
   onOpenCreate,
+  onOpenProfile,
   onRefreshNotifications,
   onMarkNotificationRead,
 }: HomeSectionProps) {
+  const t = (key: TranslationKey) => translate(language, key);
+
   return (
     <View style={styles.homeCard}>
-      <Text style={styles.homeTitle}>Home</Text>
-      <Text style={styles.homeSubtitle}>Alege ce vrei sa faci:</Text>
+      <Text style={styles.homeTitle}>{t('home')}</Text>
+      <Text style={styles.homeSubtitle}>{t('homeSubtitle')}</Text>
 
       <Pressable onPress={onOpenNearby} style={styles.homeActionPrimary}>
-        <Text style={styles.homeActionPrimaryText}>Cauta comenzi</Text>
+        <Text style={styles.homeActionPrimaryText}>{t('searchOrders')}</Text>
       </Pressable>
 
       <Pressable onPress={onOpenCreate} style={styles.homeActionSecondary}>
-        <Text style={styles.homeActionSecondaryText}>Plaseaza o comanda</Text>
+        <Text style={styles.homeActionSecondaryText}>{t('placeOrder')}</Text>
+      </Pressable>
+
+      <Pressable onPress={onOpenProfile} style={styles.homeActionSecondary}>
+        <Text style={styles.homeActionSecondaryText}>{t('profile')}</Text>
       </Pressable>
 
       <View style={styles.notificationsCard}>
         <View style={styles.notificationsHeader}>
-          <Text style={styles.notificationsTitle}>Notificari</Text>
+          <Text style={styles.notificationsTitle}>{t('notifications')}</Text>
           <View style={styles.notificationsHeaderActions}>
-            <Text style={styles.notificationsBadge}>{unreadNotificationsCount} necitite</Text>
+            <Text style={styles.notificationsBadge}>
+              {unreadNotificationsCount} {t('unread')}
+            </Text>
             <Pressable onPress={onRefreshNotifications}>
-              <Text style={styles.inlineAction}>Refresh</Text>
+              <Text style={styles.inlineAction}>{t('refresh')}</Text>
             </Pressable>
           </View>
         </View>
         {isLoadingNotifications ? (
           <ActivityIndicator color="#84cc16" />
         ) : notifications.length === 0 ? (
-          <Text style={styles.emptyState}>Nu ai notificari momentan.</Text>
+          <Text style={styles.emptyState}>{t('noNotifications')}</Text>
         ) : (
           notifications.slice(0, 5).map((notification) => (
             <View key={notification.id} style={styles.notificationRow}>
@@ -56,7 +69,7 @@ export function HomeSection({
                 <Text style={styles.notificationTitleText}>{notification.title}</Text>
                 <Text style={styles.notificationMessageText}>{notification.message}</Text>
                 <Text style={styles.notificationTimeText}>
-                  {notificationTimeLabel(notification.created_at)}
+                  {notificationTimeLabel(notification.created_at, language)}
                 </Text>
               </View>
               {!notification.read && (
@@ -64,7 +77,7 @@ export function HomeSection({
                   onPress={() => onMarkNotificationRead(notification.id)}
                   style={styles.notificationReadButton}
                 >
-                  <Text style={styles.notificationReadButtonText}>Citit</Text>
+                  <Text style={styles.notificationReadButtonText}>{t('read')}</Text>
                 </Pressable>
               )}
             </View>

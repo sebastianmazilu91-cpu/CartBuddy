@@ -1,9 +1,11 @@
 import * as SecureStore from 'expo-secure-store';
 
+import type { Language } from './i18n';
 import type { User } from './types';
 
 const AUTH_TOKEN_KEY = 'cartbuddy_auth_token';
 const AUTH_USER_KEY = 'cartbuddy_auth_user';
+const LANGUAGE_KEY = 'cartbuddy_language';
 
 export async function saveAuthSession(token: string, user: User): Promise<void> {
   try {
@@ -36,5 +38,22 @@ export async function clearStoredAuthSession(): Promise<void> {
     await SecureStore.deleteItemAsync(AUTH_USER_KEY);
   } catch {
     // Logout should still clear in-memory auth state if secure storage fails.
+  }
+}
+
+export async function saveLanguagePreference(language: Language): Promise<void> {
+  try {
+    await SecureStore.setItemAsync(LANGUAGE_KEY, language);
+  } catch {
+    // Language still works in memory if secure storage is unavailable.
+  }
+}
+
+export async function getStoredLanguagePreference(): Promise<Language | null> {
+  try {
+    const storedLanguage = await SecureStore.getItemAsync(LANGUAGE_KEY);
+    return storedLanguage === 'ro' || storedLanguage === 'en' ? storedLanguage : null;
+  } catch {
+    return null;
   }
 }

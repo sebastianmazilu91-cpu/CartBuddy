@@ -1,10 +1,11 @@
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useState } from 'react';
+import { Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import type { AuthMode, AuthProvider } from '../types';
+import { translate, type Language, type TranslationKey } from '../i18n';
+import type { AuthMode } from '../types';
 
 type AuthSectionProps = {
-  authProvider: AuthProvider;
-  onAuthProviderChange: (value: AuthProvider) => void;
+  language: Language;
   authMode: AuthMode;
   onAuthModeChange: (value: AuthMode) => void;
   displayName: string;
@@ -26,8 +27,7 @@ type AuthSectionProps = {
 };
 
 export function AuthSection({
-  authProvider,
-  onAuthProviderChange,
+  language,
   authMode,
   onAuthModeChange,
   displayName,
@@ -47,20 +47,19 @@ export function AuthSection({
   googleEnabled,
   requiredGoogleEnvVar,
 }: AuthSectionProps) {
-  const addressLabel = isResolvingAddress ? 'Se detecteaza adresa...' : detectedAddress || 'Nedisponibila';
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+  const t = (key: TranslationKey) => translate(language, key);
+  const addressLabel = isResolvingAddress ? t('detectingAddress') : detectedAddress || t('unavailable');
 
   return (
     <View style={styles.authCard}>
-      <Text style={styles.sectionTitle}>Autentificare</Text>
-
-      <Text style={styles.stepLabel}>1. Alege actiunea</Text>
       <View style={styles.authModeRow}>
         <Pressable
           onPress={() => onAuthModeChange('login')}
           style={[styles.authModeButton, authMode === 'login' && styles.authModeButtonActive]}
         >
           <Text style={[styles.authModeText, authMode === 'login' && styles.authModeTextActive]}>
-            Login
+            {t('auth')}
           </Text>
         </Pressable>
         <Pressable
@@ -68,114 +67,117 @@ export function AuthSection({
           style={[styles.authModeButton, authMode === 'register' && styles.authModeButtonActive]}
         >
           <Text style={[styles.authModeText, authMode === 'register' && styles.authModeTextActive]}>
-            Inregistrare
+            {t('createAccount')}
           </Text>
         </Pressable>
       </View>
 
-      <Text style={styles.stepLabel}>2. Alege metoda</Text>
-      <View style={styles.authProviderRow}>
-        <Pressable
-          onPress={() => onAuthProviderChange('email')}
-          style={[styles.authProviderButton, authProvider === 'email' && styles.authProviderButtonActive]}
-        >
-          <Text style={[styles.authProviderText, authProvider === 'email' && styles.authProviderTextActive]}>
-            Email
-          </Text>
-        </Pressable>
-        <Pressable
-          onPress={() => onAuthProviderChange('google')}
-          style={[styles.authProviderButton, authProvider === 'google' && styles.authProviderButtonActive]}
-        >
-          <Text style={[styles.authProviderText, authProvider === 'google' && styles.authProviderTextActive]}>
-            Google
-          </Text>
-        </Pressable>
+      <Pressable
+        onPress={onStartGoogleLogin}
+        style={[styles.googleButton, (!googleReady || !googleEnabled || isAuthSubmitting) && styles.disabledButton]}
+        disabled={isAuthSubmitting || !googleReady || !googleEnabled}
+      >
+        {isAuthSubmitting ? (
+          <Text style={styles.googleButtonText}>{t('processing')}</Text>
+        ) : (
+          <View style={styles.googleButtonContent}>
+            <Image
+              source={{ uri: 'https://developers.google.com/identity/images/g-logo.png' }}
+              style={styles.googleLogo}
+            />
+            <Text style={styles.googleButtonText}>{t('continueWithGoogle')}</Text>
+          </View>
+        )}
+      </Pressable>
+      {!googleEnabled && (
+        <Text style={styles.smallNote}>{`${t('googleEnvMissing')} ${requiredGoogleEnvVar}.`}</Text>
+      )}
+
+      <View style={styles.dividerRow}>
+        <View style={styles.dividerLine} />
+        <Text style={styles.dividerText}>{t('or')}</Text>
+        <View style={styles.dividerLine} />
       </View>
 
-      <Text style={styles.stepLabel}>3. Continua</Text>
-      {authProvider === 'email' ? (
+      {authMode === 'register' && (
         <>
-          {authMode === 'register' && (
-            <>
-              <TextInput
-                value={displayName}
-                onChangeText={onDisplayNameChange}
-                placeholder="Nume"
-                placeholderTextColor="#94a3b8"
-                style={styles.input}
-                autoCapitalize="words"
-              />
-              <TextInput
-                value={phone}
-                onChangeText={onPhoneChange}
-                placeholder="Numar telefon"
-                placeholderTextColor="#94a3b8"
-                style={styles.input}
-                keyboardType="phone-pad"
-              />
-              <AddressBox value={addressLabel} />
-            </>
-          )}
-
+          <Text style={styles.fieldLabel}>{t('name')}</Text>
           <TextInput
-            value={email}
-            onChangeText={onEmailChange}
-            placeholder="Email"
+            value={displayName}
+            onChangeText={onDisplayNameChange}
+            placeholder={t('name')}
             placeholderTextColor="#94a3b8"
             style={styles.input}
-            autoCapitalize="none"
-            keyboardType="email-address"
+            autoCapitalize="words"
           />
+          <Text style={styles.fieldLabel}>{t('phoneNumber')}</Text>
           <TextInput
-            value={password}
-            onChangeText={onPasswordChange}
-            placeholder="Parola"
+            value={phone}
+            onChangeText={onPhoneChange}
+            placeholder={t('phoneNumber')}
             placeholderTextColor="#94a3b8"
             style={styles.input}
-            secureTextEntry
+            keyboardType="phone-pad"
           />
-
-          <Pressable onPress={onSubmitEmailAuth} style={styles.primaryButton} disabled={isAuthSubmitting}>
-            <Text style={styles.primaryButtonText}>
-              {isAuthSubmitting
-                ? 'Se proceseaza...'
-                : authMode === 'login'
-                  ? 'Intra in cont'
-                  : 'Creeaza cont'}
-            </Text>
-          </Pressable>
-        </>
-      ) : (
-        <>
-          <AddressBox value={addressLabel} />
-
-          <Pressable
-            onPress={onStartGoogleLogin}
-            style={styles.googleButton}
-            disabled={isAuthSubmitting || !googleReady || !googleEnabled}
-          >
-            <Text style={styles.googleButtonText}>
-              {isAuthSubmitting
-                ? 'Se proceseaza...'
-                : authMode === 'login'
-                  ? 'Login cu Google'
-                  : 'Inregistrare cu Google'}
-            </Text>
-          </Pressable>
-          {!googleEnabled && (
-            <Text style={styles.smallNote}>{`Pentru Google login seteaza ${requiredGoogleEnvVar}.`}</Text>
-          )}
+          <AddressBox value={addressLabel} language={language} />
         </>
       )}
+
+      <Text style={styles.fieldLabel}>{t('email')}</Text>
+      <TextInput
+        value={email}
+        onChangeText={onEmailChange}
+        placeholder="email@example.com"
+        placeholderTextColor="#94a3b8"
+        style={styles.input}
+        autoCapitalize="none"
+        keyboardType="email-address"
+      />
+      <Text style={styles.fieldLabel}>{t('password')}</Text>
+      <View style={styles.passwordInputWrap}>
+        <TextInput
+          value={password}
+          onChangeText={onPasswordChange}
+          placeholder={t('password')}
+          placeholderTextColor="#94a3b8"
+          style={styles.passwordInput}
+          secureTextEntry={!isPasswordVisible}
+        />
+        <Pressable
+          onPress={() => setIsPasswordVisible((value) => !value)}
+          style={styles.passwordToggle}
+        >
+          <Text style={styles.passwordToggleText}>{isPasswordVisible ? '\u{1F648}' : '\u{1F441}'}</Text>
+        </Pressable>
+      </View>
+
+      {authMode === 'login' && (
+        <Pressable style={styles.forgotPasswordButton}>
+          <Text style={styles.forgotPasswordText}>{t('forgotPassword')}</Text>
+        </Pressable>
+      )}
+
+      <Pressable
+        onPress={onSubmitEmailAuth}
+        style={[styles.primaryButton, isAuthSubmitting && styles.disabledButton]}
+        disabled={isAuthSubmitting}
+      >
+        <Text style={styles.primaryButtonText}>
+          {isAuthSubmitting
+            ? t('processing')
+            : authMode === 'login'
+              ? t('loginEmail')
+              : t('createAccount')}
+        </Text>
+      </Pressable>
     </View>
   );
 }
 
-function AddressBox({ value }: { value: string }) {
+function AddressBox({ value, language }: { value: string; language: Language }) {
   return (
     <View style={styles.addressBox}>
-      <Text style={styles.addressTitle}>Adresa detectata prin geolocatie</Text>
+      <Text style={styles.addressTitle}>{translate(language, 'detectedAddress')}</Text>
       <Text style={styles.addressText}>{value}</Text>
     </View>
   );
@@ -188,64 +190,52 @@ const styles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     borderColor: '#334155',
-    gap: 10,
-  },
-  sectionTitle: {
-    color: '#f8fafc',
-    fontSize: 15,
-    fontWeight: '700',
-    marginBottom: 8,
-    marginTop: 4,
-  },
-  stepLabel: {
-    color: '#94a3b8',
-    fontSize: 12,
-    fontWeight: '700',
-    marginTop: 4,
-  },
-  authProviderRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  authProviderButton: {
-    flex: 1,
-    backgroundColor: '#1e293b',
-    borderRadius: 8,
-    paddingVertical: 9,
-    alignItems: 'center',
-  },
-  authProviderButtonActive: {
-    backgroundColor: '#84cc16',
-  },
-  authProviderText: {
-    color: '#cbd5e1',
-    fontWeight: '700',
-    fontSize: 13,
-  },
-  authProviderTextActive: {
-    color: '#132b02',
+    gap: 12,
   },
   authModeRow: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 18,
+    marginBottom: 4,
   },
   authModeButton: {
     flex: 1,
-    backgroundColor: '#1e293b',
-    borderRadius: 8,
-    paddingVertical: 9,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+    paddingVertical: 10,
     alignItems: 'center',
   },
   authModeButtonActive: {
-    backgroundColor: '#84cc16',
+    borderBottomColor: '#86efac',
   },
   authModeText: {
     color: '#cbd5e1',
-    fontWeight: '700',
-    fontSize: 13,
+    fontWeight: '800',
+    fontSize: 14,
   },
   authModeTextActive: {
-    color: '#132b02',
+    color: '#f8fafc',
+  },
+  dividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginVertical: 2,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#334155',
+  },
+  dividerText: {
+    color: '#94a3b8',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  fieldLabel: {
+    color: '#cbd5e1',
+    fontSize: 12,
+    fontWeight: '800',
+    marginTop: 2,
   },
   input: {
     borderWidth: 1,
@@ -256,6 +246,40 @@ const styles = StyleSheet.create({
     color: '#f8fafc',
     backgroundColor: '#0b1220',
     fontSize: 14,
+  },
+  passwordInputWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#475569',
+    borderRadius: 10,
+    backgroundColor: '#0b1220',
+  },
+  passwordInput: {
+    flex: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: '#f8fafc',
+    fontSize: 14,
+  },
+  passwordToggle: {
+    width: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'stretch',
+  },
+  passwordToggleText: {
+    color: '#e2e8f0',
+    fontSize: 17,
+  },
+  forgotPasswordButton: {
+    alignSelf: 'flex-end',
+    paddingVertical: 2,
+  },
+  forgotPasswordText: {
+    color: '#bfdbfe',
+    fontSize: 12,
+    fontWeight: '700',
   },
   addressBox: {
     borderWidth: 1,
@@ -276,7 +300,7 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     marginTop: 8,
-    backgroundColor: '#84cc16',
+    backgroundColor: '#65a30d',
     borderRadius: 10,
     paddingVertical: 12,
     alignItems: 'center',
@@ -293,6 +317,16 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     alignItems: 'center',
   },
+  googleButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  googleLogo: {
+    width: 18,
+    height: 18,
+  },
   googleButtonText: {
     color: '#0f172a',
     fontWeight: '800',
@@ -301,5 +335,8 @@ const styles = StyleSheet.create({
   smallNote: {
     color: '#94a3b8',
     fontSize: 11,
+  },
+  disabledButton: {
+    opacity: 0.55,
   },
 });

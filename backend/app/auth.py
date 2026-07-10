@@ -300,6 +300,40 @@ def get_user_from_token(token: str) -> dict | None:
     return _serialize_user(row)
 
 
+def update_user_profile(
+    user_id: str,
+    phone: str,
+    address: str,
+    latitude: float,
+    longitude: float,
+) -> dict:
+    normalized_phone = phone.strip()
+    normalized_address = address.strip()
+    with get_connection(write=True) as connection:
+        connection.execute(
+            """
+            UPDATE users
+            SET phone = ?,
+                address = ?,
+                latitude = ?,
+                longitude = ?
+            WHERE id = ?
+            """,
+            (normalized_phone, normalized_address, latitude, longitude, user_id),
+        )
+        user = connection.execute(
+            """
+            SELECT id, email, display_name, phone, address, latitude, longitude
+            FROM users WHERE id = ?
+            """,
+            (user_id,),
+        ).fetchone()
+
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    return _serialize_user(user)
+
+
 def require_user(authorization: str | None = Header(default=None)) -> dict:
     if authorization is None or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Missing bearer token")
@@ -311,4 +345,3 @@ def require_user(authorization: str | None = Header(default=None)) -> dict:
     if user is None:
         raise HTTPException(status_code=401, detail="Session expired or invalid")
     return user
-
