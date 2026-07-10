@@ -33,6 +33,10 @@ def init_db() -> None:
                 expires_at TEXT NOT NULL,
                 status TEXT NOT NULL DEFAULT 'open',
                 extended_once INTEGER NOT NULL DEFAULT 0,
+                delivery_fee REAL NOT NULL DEFAULT 0,
+                processing_fee REAL NOT NULL DEFAULT 0,
+                minimum_order_value REAL,
+                currency TEXT NOT NULL DEFAULT 'RON',
                 created_at TEXT NOT NULL
             )
             """
@@ -203,6 +207,15 @@ def _migrate_orders_table(connection: sqlite3.Connection) -> None:
 
     if not _column_exists(connection, "orders", "extended_once"):
         connection.execute("ALTER TABLE orders ADD COLUMN extended_once INTEGER NOT NULL DEFAULT 0")
+
+    if not _column_exists(connection, "orders", "delivery_fee"):
+        connection.execute("ALTER TABLE orders ADD COLUMN delivery_fee REAL NOT NULL DEFAULT 0")
+    if not _column_exists(connection, "orders", "processing_fee"):
+        connection.execute("ALTER TABLE orders ADD COLUMN processing_fee REAL NOT NULL DEFAULT 0")
+    if not _column_exists(connection, "orders", "minimum_order_value"):
+        connection.execute("ALTER TABLE orders ADD COLUMN minimum_order_value REAL")
+    if not _column_exists(connection, "orders", "currency"):
+        connection.execute("ALTER TABLE orders ADD COLUMN currency TEXT NOT NULL DEFAULT 'RON'")
 
 
 def _migrate_users_table(connection: sqlite3.Connection) -> None:

@@ -60,6 +60,10 @@ class CreateOrderRequest(BaseModel):
     max_wait_days: int = Field(ge=1, le=10)
     latitude: float = Field(ge=-90, le=90)
     longitude: float = Field(ge=-180, le=180)
+    delivery_fee: float = Field(ge=0, le=1_000_000)
+    processing_fee: float = Field(ge=0, le=1_000_000)
+    minimum_order_value: float | None = Field(default=None, ge=0, le=1_000_000)
+    currency: Literal["EUR", "USD", "RON", "GBP", "MDL", "CHF", "CAD", "AUD", "JPY", "CNY", "PLN", "HUF", "TRY"]
 
     @field_validator("platform")
     @classmethod
@@ -89,6 +93,10 @@ class OrderResponse(BaseModel):
     join_state: Literal["none", "reserved", "joined"] = "none"
     my_reservation_expires_at: datetime | None = None
     priority_score: float | None = None
+    delivery_fee: float
+    processing_fee: float
+    minimum_order_value: float | None = None
+    currency: str
 
 
 class NearbyOrdersResponse(BaseModel):

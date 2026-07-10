@@ -102,7 +102,8 @@ def _cleanup_expired_reservations(connection) -> None:
 def _order_select_sql(where_clause: str = "") -> str:
     base = """
         SELECT id, platform, min_people, current_people, created_by, latitude, longitude,
-               max_wait_days, expires_at, status, extended_once, created_at
+               max_wait_days, expires_at, status, extended_once, created_at,
+               delivery_fee, processing_fee, minimum_order_value, currency
         FROM orders
     """
     if where_clause:
@@ -138,6 +139,10 @@ def _to_order_response(
         join_state=join_state,
         my_reservation_expires_at=my_reservation_expires_at,
         priority_score=priority_score,
+        delivery_fee=row["delivery_fee"],
+        processing_fee=row["processing_fee"],
+        minimum_order_value=row["minimum_order_value"],
+        currency=row["currency"],
     )
 
 
@@ -425,9 +430,10 @@ def create_order(payload: CreateOrderRequest, creator_name: str) -> OrderRespons
             """
             INSERT INTO orders(
                 id, platform, min_people, current_people, created_by,
-                latitude, longitude, max_wait_days, expires_at, status, extended_once, created_at
+                latitude, longitude, max_wait_days, expires_at, status, extended_once, created_at,
+                delivery_fee, processing_fee, minimum_order_value, currency
             )
-            VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', 0, ?)
+            VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', 0, ?, ?, ?, ?, ?)
             """,
             (
                 order_id,
@@ -440,6 +446,10 @@ def create_order(payload: CreateOrderRequest, creator_name: str) -> OrderRespons
                 payload.max_wait_days,
                 expires_at,
                 created_at,
+                payload.delivery_fee,
+                payload.processing_fee,
+                payload.minimum_order_value,
+                payload.currency,
             ),
         )
         connection.execute(

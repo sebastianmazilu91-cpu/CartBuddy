@@ -46,6 +46,10 @@ export type OrderItem = {
   join_state: 'none' | 'reserved' | 'joined';
   my_reservation_expires_at: string | null;
   priority_score: number | null;
+  delivery_fee: number;
+  processing_fee: number;
+  minimum_order_value: number | null;
+  currency: string;
 };
 
 export type ProductLinkItem = {

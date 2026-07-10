@@ -69,6 +69,22 @@ import { LANGUAGES, translate, type Language, type TranslationKey } from './src/
 
 WebBrowser.maybeCompleteAuthSession();
 
+const CURRENCIES = [
+  { code: 'EUR', symbol: '€', ro: 'Euro', en: 'Euro' },
+  { code: 'USD', symbol: '$', ro: 'Dolar american', en: 'US dollar' },
+  { code: 'RON', symbol: 'lei', ro: 'Leu românesc', en: 'Romanian leu' },
+  { code: 'GBP', symbol: '£', ro: 'Liră sterlină', en: 'British pound' },
+  { code: 'MDL', symbol: 'L', ro: 'Leu moldovenesc', en: 'Moldovan leu' },
+  { code: 'CHF', symbol: 'CHF', ro: 'Franc elvețian', en: 'Swiss franc' },
+  { code: 'CAD', symbol: 'C$', ro: 'Dolar canadian', en: 'Canadian dollar' },
+  { code: 'AUD', symbol: 'A$', ro: 'Dolar australian', en: 'Australian dollar' },
+  { code: 'JPY', symbol: '¥', ro: 'Yen japonez', en: 'Japanese yen' },
+  { code: 'CNY', symbol: '¥', ro: 'Yuan chinezesc', en: 'Chinese yuan' },
+  { code: 'PLN', symbol: 'zł', ro: 'Zlot polonez', en: 'Polish zloty' },
+  { code: 'HUF', symbol: 'Ft', ro: 'Forint maghiar', en: 'Hungarian forint' },
+  { code: 'TRY', symbol: '₺', ro: 'Liră turcească', en: 'Turkish lira' },
+] as const;
+
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldPlaySound: false,
@@ -154,6 +170,11 @@ export default function App() {
   const [selectedRadius, setSelectedRadius] = useState<number>(500);
   const [selectedMinPeople, setSelectedMinPeople] = useState<number>(2);
   const [selectedWaitDays, setSelectedWaitDays] = useState<number>(1);
+  const [deliveryFee, setDeliveryFee] = useState('');
+  const [processingFee, setProcessingFee] = useState('');
+  const [minimumOrderValue, setMinimumOrderValue] = useState('');
+  const [selectedCurrency, setSelectedCurrency] = useState('RON');
+  const [isCurrencyDropdownOpen, setIsCurrencyDropdownOpen] = useState(false);
 
   const [nearbyRadiusFilter, setNearbyRadiusFilter] = useState<number>(1000);
   const [nearbyPlatformFilter, setNearbyPlatformFilter] = useState<string>(ALL_PLATFORMS);
@@ -375,7 +396,7 @@ export default function App() {
       const result = await fetchJson<{ items: string[] }>(`${API_BASE_URL}/platforms`);
       if (result.items.length > 0) {
         setPlatforms(result.items);
-        if (!result.items.includes(selectedPlatform)) {
+        if (selectedPlatform !== OTHER_PLATFORMS && !result.items.includes(selectedPlatform)) {
           setSelectedPlatform(result.items[0]);
         }
       }
@@ -748,6 +769,19 @@ export default function App() {
       Alert.alert(t('incompleteData'), t('customPlatformRequired'));
       return;
     }
+    const parseAmount = (value: string) => Number(value.trim().replace(',', '.'));
+    const parsedDeliveryFee = parseAmount(deliveryFee);
+    const parsedProcessingFee = parseAmount(processingFee);
+    const parsedMinimumValue = minimumOrderValue.trim() ? parseAmount(minimumOrderValue) : null;
+    if (
+      !deliveryFee.trim() || !processingFee.trim() ||
+      !Number.isFinite(parsedDeliveryFee) || parsedDeliveryFee < 0 ||
+      !Number.isFinite(parsedProcessingFee) || parsedProcessingFee < 0 ||
+      (parsedMinimumValue !== null && (!Number.isFinite(parsedMinimumValue) || parsedMinimumValue < 0))
+    ) {
+      Alert.alert(t('invalidAmounts'), t('invalidAmountsMessage'));
+      return;
+    }
 
     try {
       await fetchJson<OrderItem>(`${API_BASE_URL}/orders`, {
@@ -759,8 +793,15 @@ export default function App() {
           max_wait_days: selectedWaitDays,
           latitude: myLocation.latitude,
           longitude: myLocation.longitude,
+          delivery_fee: parsedDeliveryFee,
+          processing_fee: parsedProcessingFee,
+          minimum_order_value: parsedMinimumValue,
+          currency: selectedCurrency,
         }),
       });
+      setDeliveryFee('');
+      setProcessingFee('');
+      setMinimumOrderValue('');
       setActiveTab('nearby');
       setNearbyPlatformFilter(selectedPlatform === OTHER_PLATFORMS ? OTHER_PLATFORMS : platformForOrder);
       setNearbyRadiusFilter(selectedRadius);
@@ -1291,6 +1332,62 @@ export default function App() {
             <Text style={styles.sectionTitle}>{t('matchingRadius')}</Text>
             <RadiusBarSelector language={language} value={selectedRadius} onChange={setSelectedRadius} />
 
+            <Text style={styles.sectionTitle}>{t('orderCosts')}</Text>
+            <Text style={styles.profileLabel}>{t('currency')}</Text>
+            <Pressable
+              onPress={() => setIsCurrencyDropdownOpen((open) => !open)}
+              style={styles.currencyDropdownButton}
+            >
+              <Text style={styles.currencyDropdownText}>
+                {CURRENCIES.find((item) => item.code === selectedCurrency)?.symbol} {selectedCurrency} ▾
+              </Text>
+            </Pressable>
+            {isCurrencyDropdownOpen && (
+              <View style={styles.currencyDropdownList}>
+                {CURRENCIES.map((item) => (
+                  <Pressable
+                    key={item.code}
+                    onPress={() => {
+                      setSelectedCurrency(item.code);
+                      setIsCurrencyDropdownOpen(false);
+                    }}
+                    style={[styles.currencyOption, selectedCurrency === item.code && styles.currencyOptionSelected]}
+                  >
+                    <Text style={styles.currencyDropdownText}>
+                      {item.symbol}  {item.code} — {item[language]}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            )}
+            <Text style={styles.profileLabel}>{t('deliveryFee')} *</Text>
+            <TextInput
+              value={deliveryFee}
+              onChangeText={setDeliveryFee}
+              placeholder={`0.00 ${selectedCurrency}`}
+              placeholderTextColor="#94a3b8"
+              style={styles.input}
+              keyboardType="decimal-pad"
+            />
+            <Text style={styles.profileLabel}>{t('processingFee')} *</Text>
+            <TextInput
+              value={processingFee}
+              onChangeText={setProcessingFee}
+              placeholder={`0.00 ${selectedCurrency}`}
+              placeholderTextColor="#94a3b8"
+              style={styles.input}
+              keyboardType="decimal-pad"
+            />
+            <Text style={styles.profileLabel}>{t('minimumOrderValue')}</Text>
+            <TextInput
+              value={minimumOrderValue}
+              onChangeText={setMinimumOrderValue}
+              placeholder={`${t('optional')} · 0.00 ${selectedCurrency}`}
+              placeholderTextColor="#94a3b8"
+              style={styles.input}
+              keyboardType="decimal-pad"
+            />
+
             <Pressable onPress={createOrder} style={styles.primaryButton}>
               <Text style={styles.primaryButtonText}>{t('publishOrder')}</Text>
             </Pressable>
@@ -1622,6 +1719,35 @@ const styles = StyleSheet.create({
     color: '#f8fafc',
     backgroundColor: '#0b1220',
     fontSize: 14,
+  },
+  currencyDropdownButton: {
+    borderWidth: 1,
+    borderColor: '#84cc16',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    backgroundColor: '#0b1220',
+  },
+  currencyDropdownList: {
+    borderWidth: 1,
+    borderColor: '#475569',
+    borderRadius: 10,
+    overflow: 'hidden',
+    backgroundColor: '#0b1220',
+  },
+  currencyOption: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#334155',
+  },
+  currencyOptionSelected: {
+    backgroundColor: '#365314',
+  },
+  currencyDropdownText: {
+    color: '#f8fafc',
+    fontSize: 14,
+    fontWeight: '600',
   },
   multilineInput: {
     minHeight: 76,

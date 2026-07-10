@@ -85,10 +85,39 @@ def create_order(
             "max_wait_days": 1,
             "latitude": 44.4268,
             "longitude": 26.1025,
+            "delivery_fee": 19.99,
+            "processing_fee": 2.5,
+            "minimum_order_value": 100,
+            "currency": "RON",
         },
     )
     assert response.status_code == 200, response.text
     return response.json()
+
+
+def test_order_costs_are_saved_and_minimum_value_is_optional(client: TestClient) -> None:
+    creator = register_user(client, "CostCreator")
+    response = client.post(
+        "/orders",
+        headers=auth_headers(creator),
+        json={
+            "platform": "Amazon",
+            "min_people": 2,
+            "max_wait_days": 1,
+            "latitude": 44.4268,
+            "longitude": 26.1025,
+            "delivery_fee": 4.99,
+            "processing_fee": 1.25,
+            "currency": "EUR",
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    order = response.json()
+    assert order["delivery_fee"] == 4.99
+    assert order["processing_fee"] == 1.25
+    assert order["minimum_order_value"] is None
+    assert order["currency"] == "EUR"
 
 
 def test_register_login_and_me(client: TestClient) -> None:

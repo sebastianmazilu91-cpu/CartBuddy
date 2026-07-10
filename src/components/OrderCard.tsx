@@ -11,6 +11,29 @@ import {
 import { translate, type Language, type TranslationKey } from '../i18n';
 import type { OrderItem, OrderMessageItem, OrderStatus, ProductLinkItem } from '../types';
 
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  EUR: '€', USD: '$', RON: 'lei', GBP: '£', MDL: 'L', CHF: 'CHF',
+  CAD: 'C$', AUD: 'A$', JPY: '¥', CNY: '¥', PLN: 'zł', HUF: 'Ft', TRY: '₺',
+};
+
+function formatMoney(value: number, currency: string): string {
+  const amount = new Intl.NumberFormat('ro-RO', { maximumFractionDigits: 2 }).format(value);
+  return `${amount} ${CURRENCY_SYMBOLS[currency] ?? currency}`;
+}
+
+function OrderCosts({ language, order }: { language: Language; order: OrderItem }) {
+  const t = (key: TranslationKey) => translate(language, key);
+  return (
+    <View>
+      <Text style={styles.orderMeta}>{t('deliveryFee')}: {formatMoney(order.delivery_fee, order.currency)}</Text>
+      <Text style={styles.orderMeta}>{t('processingFee')}: {formatMoney(order.processing_fee, order.currency)}</Text>
+      {order.minimum_order_value !== null && (
+        <Text style={styles.orderMeta}>{t('minimumOrderValue')}: {formatMoney(order.minimum_order_value, order.currency)}</Text>
+      )}
+    </View>
+  );
+}
+
 type MyOrderCardProps = {
   language: Language;
   order: OrderItem;
@@ -33,6 +56,7 @@ export function MyOrderCard({ language, order, onExtend, onStatusChange }: MyOrd
       <Text style={styles.orderMeta}>{t('interval')}: {order.max_wait_days} {t('days')}</Text>
       <Text style={styles.orderMeta}>{t('timeLeft')}: {timeLeftLabel(order.expires_at, language)}</Text>
       <Text style={styles.orderMeta}>{t('extensionUsed')}: {order.extended_once ? t('yes') : t('no')}</Text>
+      <OrderCosts language={language} order={order} />
 
       {canExtend && (
         <Pressable onPress={() => onExtend(order.id)} style={styles.secondaryButton}>
@@ -144,6 +168,7 @@ export function NearbyOrderCard({
       <Text style={styles.orderMeta}>{t('activeReservations')}: {order.reserved_people}</Text>
       <Text style={styles.orderMeta}>{t('availableSlots')}: {order.available_slots}</Text>
       <Text style={styles.orderMeta}>{t('timeLeft')}: {timeLeftLabel(order.expires_at, language)}</Text>
+      <OrderCosts language={language} order={order} />
       {isReserved && (
         <Text style={styles.orderMeta}>
           {t('reservedSpot')}: {reservationTimeLeftLabel(reservationExpiresAt, language)}
