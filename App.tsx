@@ -205,16 +205,6 @@ export default function App() {
   const googleWebClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID?.trim() ?? '';
   const googleExpoClientId = process.env.EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID?.trim() ?? '';
 
-  const requiredGoogleEnvVar = useMemo(() => {
-    if (Platform.OS === 'android') {
-      return 'EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID';
-    }
-    if (Platform.OS === 'ios') {
-      return 'EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID';
-    }
-    return 'EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID';
-  }, []);
-
   const googleEnabled = useMemo(() => {
     if (Platform.OS === 'android') {
       return Boolean(googleAndroidClientId);
@@ -700,10 +690,6 @@ export default function App() {
 
   async function startGoogleLogin() {
     if (!googleEnabled) {
-      Alert.alert(
-        t('googleNotConfigured'),
-        `${t('googleConfigMessage')} (${requiredGoogleEnvVar})`,
-      );
       return;
     }
     if (!googleRequest) {
@@ -1206,7 +1192,6 @@ export default function App() {
             onStartGoogleLogin={startGoogleLogin}
             googleReady={Boolean(googleRequest)}
             googleEnabled={googleEnabled}
-            requiredGoogleEnvVar={requiredGoogleEnvVar}
           />
         ) : activeTab === 'home' ? (
           <HomeSection

@@ -23,7 +23,6 @@ type AuthSectionProps = {
   onStartGoogleLogin: () => void;
   googleReady: boolean;
   googleEnabled: boolean;
-  requiredGoogleEnvVar: string;
 };
 
 export function AuthSection({
@@ -45,7 +44,6 @@ export function AuthSection({
   onStartGoogleLogin,
   googleReady,
   googleEnabled,
-  requiredGoogleEnvVar,
 }: AuthSectionProps) {
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const t = (key: TranslationKey) => translate(language, key);
@@ -72,32 +70,33 @@ export function AuthSection({
         </Pressable>
       </View>
 
-      <Pressable
-        onPress={onStartGoogleLogin}
-        style={[styles.googleButton, (!googleReady || !googleEnabled || isAuthSubmitting) && styles.disabledButton]}
-        disabled={isAuthSubmitting || !googleReady || !googleEnabled}
-      >
-        {isAuthSubmitting ? (
-          <Text style={styles.googleButtonText}>{t('processing')}</Text>
-        ) : (
-          <View style={styles.googleButtonContent}>
-            <Image
-              source={{ uri: 'https://developers.google.com/identity/images/g-logo.png' }}
-              style={styles.googleLogo}
-            />
-            <Text style={styles.googleButtonText}>{t('continueWithGoogle')}</Text>
-          </View>
-        )}
-      </Pressable>
-      {!googleEnabled && (
-        <Text style={styles.smallNote}>{`${t('googleEnvMissing')} ${requiredGoogleEnvVar}.`}</Text>
-      )}
+      {googleEnabled && (
+        <>
+          <Pressable
+            onPress={onStartGoogleLogin}
+            style={[styles.googleButton, (!googleReady || isAuthSubmitting) && styles.disabledButton]}
+            disabled={isAuthSubmitting || !googleReady}
+          >
+            {isAuthSubmitting ? (
+              <Text style={styles.googleButtonText}>{t('processing')}</Text>
+            ) : (
+              <View style={styles.googleButtonContent}>
+                <Image
+                  source={{ uri: 'https://developers.google.com/identity/images/g-logo.png' }}
+                  style={styles.googleLogo}
+                />
+                <Text style={styles.googleButtonText}>{t('continueWithGoogle')}</Text>
+              </View>
+            )}
+          </Pressable>
 
-      <View style={styles.dividerRow}>
-        <View style={styles.dividerLine} />
-        <Text style={styles.dividerText}>{t('or')}</Text>
-        <View style={styles.dividerLine} />
-      </View>
+          <View style={styles.dividerRow}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>{t('or')}</Text>
+            <View style={styles.dividerLine} />
+          </View>
+        </>
+      )}
 
       {authMode === 'register' && (
         <>
