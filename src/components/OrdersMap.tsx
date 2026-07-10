@@ -1,5 +1,6 @@
-import { Image, Platform, StyleSheet, Text, View } from 'react-native';
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import { Alert, Image, Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import MapView, { Marker, PROVIDER_GOOGLE, type MapPressEvent } from 'react-native-maps';
 
 import { formatDistance } from '../formatters';
 import { translate, type Language, type TranslationKey } from '../i18n';
@@ -58,12 +59,37 @@ function PlatformLogo({ platform }: { platform: string }) {
 
 export function OrdersMap({ language, orders, userLocation, radiusMeters }: OrdersMapProps) {
   const t = (key: TranslationKey) => translate(language, key);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const selectedOrder = orders.find((order) => order.id === selectedOrderId) ?? null;
   const region = {
     latitude: userLocation.latitude,
     longitude: userLocation.longitude,
     latitudeDelta: latitudeDeltaForRadius(radiusMeters),
     longitudeDelta: longitudeDeltaForRadius(radiusMeters, userLocation.latitude),
   };
+
+  async function openRoute(travelMode: 'driving' | 'walking' | 'transit') {
+    if (!selectedOrder) {
+      return;
+    }
+    const params = new URLSearchParams({
+      api: '1',
+      origin: `${userLocation.latitude},${userLocation.longitude}`,
+      destination: `${selectedOrder.latitude},${selectedOrder.longitude}`,
+      travelmode: travelMode,
+    });
+    try {
+      await Linking.openURL(`https://www.google.com/maps/dir/?${params.toString()}`);
+    } catch {
+      Alert.alert(t('invalidLink'), t('openLinkFailed'));
+    }
+  }
+
+  function handleMapPress(event: MapPressEvent) {
+    if (event.nativeEvent.action !== 'marker-press') {
+      setSelectedOrderId(null);
+    }
+  }
 
   return (
     <View style={styles.wrapper}>
@@ -79,6 +105,7 @@ export function OrdersMap({ language, orders, userLocation, radiusMeters }: Orde
         showsMyLocationButton
         showsCompass
         toolbarEnabled
+        onPress={handleMapPress}
       >
         {orders.map((order) => (
           <Marker
@@ -86,6 +113,7 @@ export function OrdersMap({ language, orders, userLocation, radiusMeters }: Orde
             coordinate={{ latitude: order.latitude, longitude: order.longitude }}
             title={order.platform}
             description={`${t('participants')}: ${order.current_people}/${order.min_people}`}
+            onPress={() => setSelectedOrderId(order.id)}
           >
             <View style={styles.markerWrap}>
               <PlatformLogo platform={order.platform} />
@@ -96,6 +124,24 @@ export function OrdersMap({ language, orders, userLocation, radiusMeters }: Orde
           </Marker>
         ))}
       </MapView>
+      {selectedOrder ? (
+        <View style={styles.routePanel}>
+          <Text style={styles.routeTitle}>{t('routeTo')}: {selectedOrder.platform}</Text>
+          <View style={styles.routeActions}>
+            <Pressable style={styles.routeButton} onPress={() => openRoute('driving')}>
+              <Text style={styles.routeButtonText}>🚗 {t('driving')}</Text>
+            </Pressable>
+            <Pressable style={styles.routeButton} onPress={() => openRoute('walking')}>
+              <Text style={styles.routeButtonText}>🚶 {t('walking')}</Text>
+            </Pressable>
+            <Pressable style={styles.routeButton} onPress={() => openRoute('transit')}>
+              <Text style={styles.routeButtonText}>🚌 {t('publicTransit')}</Text>
+            </Pressable>
+          </View>
+        </View>
+      ) : (
+        <Text style={styles.routeHint}>{t('selectOrderForRoute')}</Text>
+      )}
     </View>
   );
 }
@@ -167,5 +213,39 @@ const styles = StyleSheet.create({
     paddingHorizontal: 5,
     paddingVertical: 2,
     overflow: 'hidden',
+  },
+  routePanel: {
+    gap: 8,
+    paddingTop: 2,
+  },
+  routeTitle: {
+    color: '#f8fafc',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  routeActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 7,
+  },
+  routeButton: {
+    flexGrow: 1,
+    borderWidth: 1,
+    borderColor: '#84cc16',
+    borderRadius: 9,
+    paddingHorizontal: 9,
+    paddingVertical: 9,
+    alignItems: 'center',
+    backgroundColor: '#1e293b',
+  },
+  routeButtonText: {
+    color: '#d9f99d',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  routeHint: {
+    color: '#94a3b8',
+    fontSize: 11,
+    textAlign: 'center',
   },
 });

@@ -10,7 +10,6 @@ import {
   Linking,
   Platform,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   StatusBar as NativeStatusBar,
@@ -19,6 +18,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 import { fetchJson } from './src/api';
 import {
@@ -1033,30 +1033,8 @@ export default function App() {
       return;
     }
 
-    const visibleOrders = orders.slice(0, 10);
-    const origin = `${myLocation.latitude},${myLocation.longitude}`;
-    const destination =
-      visibleOrders.length > 0
-        ? `${visibleOrders[visibleOrders.length - 1].latitude},${visibleOrders[visibleOrders.length - 1].longitude}`
-        : origin;
-    const waypoints = visibleOrders
-      .slice(0, -1)
-      .map((order) => `${order.latitude},${order.longitude}`)
-      .join('|');
-    const params = new URLSearchParams({
-      api: '1',
-      origin,
-      destination,
-      travelmode: 'driving',
-    });
-    if (waypoints) {
-      params.set('waypoints', waypoints);
-    }
-
-    const url =
-      visibleOrders.length > 0
-        ? `https://www.google.com/maps/dir/?${params.toString()}`
-        : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(origin)}`;
+    const center = `${myLocation.latitude},${myLocation.longitude}`;
+    const url = `https://www.google.com/maps/@?api=1&map_action=map&center=${encodeURIComponent(center)}&zoom=14`;
 
     try {
       await Linking.openURL(url);
@@ -1127,7 +1105,8 @@ export default function App() {
   }
 
   return (
-    <SafeAreaView style={[styles.screen, styles.androidStatusBarInset]}>
+    <SafeAreaProvider>
+      <SafeAreaView style={[styles.screen, styles.androidStatusBarInset]}>
       <ExpoStatusBar style="light" />
       <View style={[styles.header, tabletWidthStyle]}>
         <View style={styles.headerTitleRow}>
@@ -1525,7 +1504,8 @@ export default function App() {
           </View>
         )}
       </ScrollView>
-    </SafeAreaView>
+      </SafeAreaView>
+    </SafeAreaProvider>
   );
 }
 
