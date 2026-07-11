@@ -460,6 +460,11 @@ def _user_rating_summary(connection, user_name: str) -> UserRatingSummaryRespons
     )
 
 
+def get_user_rating_summary(user_name: str) -> UserRatingSummaryResponse:
+    with get_connection() as connection:
+        return _user_rating_summary(connection, user_name)
+
+
 def ensure_seed_data() -> None:
     with get_connection(write=True) as connection:
         _cleanup_expired_reservations(connection)

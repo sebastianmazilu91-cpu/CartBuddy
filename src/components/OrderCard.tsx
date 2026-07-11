@@ -25,10 +25,15 @@ function formatMoney(value: number, currency: string): string {
 
 function OrderCosts({ language, order }: { language: Language; order: OrderItem }) {
   const t = (key: TranslationKey) => translate(language, key);
+  const sharedFeesPerParticipant =
+    (order.delivery_fee + order.processing_fee) / Math.max(order.current_people, 1);
   return (
     <View>
       <Text style={styles.orderMeta}>{t('deliveryFee')}: {formatMoney(order.delivery_fee, order.currency)}</Text>
       <Text style={styles.orderMeta}>{t('processingFee')}: {formatMoney(order.processing_fee, order.currency)}</Text>
+      <Text style={styles.sharedCostText}>
+        {t('sharedFeesPerParticipant')}: {formatMoney(sharedFeesPerParticipant, order.currency)}
+      </Text>
       {order.minimum_order_value !== null && (
         <Text style={styles.orderMeta}>{t('minimumOrderValue')}: {formatMoney(order.minimum_order_value, order.currency)}</Text>
       )}
@@ -586,6 +591,12 @@ const styles = StyleSheet.create({
   orderMeta: {
     color: '#cbd5e1',
     fontSize: 13,
+  },
+  sharedCostText: {
+    color: '#d9f99d',
+    fontSize: 13,
+    fontWeight: '800',
+    marginTop: 4,
   },
   input: {
     borderWidth: 1,

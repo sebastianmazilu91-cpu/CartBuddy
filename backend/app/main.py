@@ -29,6 +29,7 @@ from .schemas import (
     UpdateOrderStatusRequest,
     UpdateProfileRequest,
     UserResponse,
+    UserRatingSummaryResponse,
 )
 from .service import (
     MAX_LINK_SLOTS_PER_MEMBER,
@@ -39,6 +40,7 @@ from .service import (
     ensure_seed_data,
     extend_order_once,
     get_member_slots_used,
+    get_user_rating_summary,
     join_order,
     list_order_links,
     list_order_messages,
@@ -323,6 +325,11 @@ def get_nearby_orders(
 @app.get("/orders/mine", response_model=NearbyOrdersResponse)
 def get_my_orders(current_user: dict = Depends(require_user)) -> NearbyOrdersResponse:
     return NearbyOrdersResponse(items=list_my_orders(current_user["display_name"]))
+
+
+@app.get("/auth/me/ratings", response_model=UserRatingSummaryResponse)
+def get_my_ratings(current_user: dict = Depends(require_user)) -> UserRatingSummaryResponse:
+    return get_user_rating_summary(current_user["display_name"])
 
 
 @app.post("/orders/{order_id}/join", response_model=OrderResponse)

@@ -58,6 +58,7 @@ import type {
   ProductLinksResponse,
   Tab,
   User,
+  UserRatingSummary,
 } from './src/types';
 import { AuthSection } from './src/components/AuthSection';
 import { HomeSection } from './src/components/HomeSection';
@@ -164,6 +165,9 @@ export default function App() {
   const [profilePhone, setProfilePhone] = useState('');
   const [profileAddress, setProfileAddress] = useState('');
   const [isProfileSaving, setIsProfileSaving] = useState(false);
+  const [isMyRatingsOpen, setIsMyRatingsOpen] = useState(false);
+  const [isLoadingMyRatings, setIsLoadingMyRatings] = useState(false);
+  const [myRatingSummary, setMyRatingSummary] = useState<UserRatingSummary | null>(null);
 
   const [selectedPlatform, setSelectedPlatform] = useState<string>('Amazon');
   const [customPlatformName, setCustomPlatformName] = useState('');
@@ -740,6 +744,32 @@ export default function App() {
     }
   }
 
+  async function toggleMyRatings() {
+    if (isMyRatingsOpen) {
+      setIsMyRatingsOpen(false);
+      return;
+    }
+    setIsMyRatingsOpen(true);
+    if (myRatingSummary || !authToken) return;
+    setIsLoadingMyRatings(true);
+    try {
+      const summary = await fetchJson<UserRatingSummary>(`${API_BASE_URL}/auth/me/ratings`, {
+        headers: authHeaders(),
+      });
+      setMyRatingSummary(summary);
+    } catch {
+      setMyRatingSummary({
+        organizer_average: null,
+        organizer_count: 0,
+        participant_average: null,
+        participant_count: 0,
+        recent_comments: [],
+      });
+    } finally {
+      setIsLoadingMyRatings(false);
+    }
+  }
+
   async function createOrder() {
     if (!myLocation) {
       Alert.alert(t('locationUnavailable'), t('noValidLocation'));
@@ -1284,7 +1314,7 @@ export default function App() {
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>{t('profile')}</Text>
             <Text style={styles.profileLabel}>{t('language')}</Text>
-            <View style={styles.chipWrap}>
+            <View style={[styles.chipWrap, styles.profileLanguageOptions]}>
               {LANGUAGES.map((item) => (
                 <ChipButton
                   key={item.value}
@@ -1302,6 +1332,41 @@ export default function App() {
               <Text style={styles.profileLabel}>{t('displayName')}</Text>
               <Text style={styles.profileValue}>{currentUser.display_name}</Text>
             </View>
+            <Pressable onPress={toggleMyRatings} style={styles.profileRatingsButton}>
+              <Text style={styles.profileRatingsButtonText}>
+                {isMyRatingsOpen ? t('hideMyRatings') : t('viewMyRatings')}
+              </Text>
+            </Pressable>
+            {isMyRatingsOpen && (
+              <View style={styles.profileRatingsSection}>
+                <Text style={styles.sectionTitle}>{t('myRatingsAndReviews')}</Text>
+                {isLoadingMyRatings ? (
+                  <ActivityIndicator color="#84cc16" />
+                ) : !myRatingSummary || (myRatingSummary.organizer_count === 0 && myRatingSummary.participant_count === 0) ? (
+                  <Text style={styles.smallNote}>{t('noReviewsYet')}</Text>
+                ) : (
+                  <View style={styles.profileInfoBox}>
+                    {myRatingSummary.organizer_count > 0 && (
+                      <Text style={styles.profileRatingValue}>
+                        {t('organizerRating')}: ★ {myRatingSummary.organizer_average}/5 ({myRatingSummary.organizer_count})
+                      </Text>
+                    )}
+                    {myRatingSummary.participant_count > 0 && (
+                      <Text style={styles.profileRatingValue}>
+                        {t('participantRating')}: ★ {myRatingSummary.participant_average}/5 ({myRatingSummary.participant_count})
+                      </Text>
+                    )}
+                    <Text style={styles.profileLabel}>{t('receivedReviews')}</Text>
+                    {(myRatingSummary.recent_comments ?? []).map((review, index) => (
+                      <View key={`${review.created_at}-${index}`} style={styles.profileReviewRow}>
+                        <Text style={styles.profileValue}>★ {review.score}/5 — {review.reviewer_name}</Text>
+                        <Text style={styles.smallNote}>“{review.comment}”</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
+            )}
             <Text style={styles.profileLabel}>{t('phoneNumber')}</Text>
             <TextInput
               value={profilePhone}
@@ -1836,6 +1901,10 @@ const styles = StyleSheet.create({
     gap: 3,
     marginBottom: 8,
   },
+  profileLanguageOptions: {
+    marginTop: 10,
+    marginBottom: 8,
+  },
   profileLabel: {
     color: '#cbd5e1',
     fontSize: 12,
@@ -1845,6 +1914,33 @@ const styles = StyleSheet.create({
   profileValue: {
     color: '#f8fafc',
     fontSize: 14,
+  },
+  profileRatingsButton: {
+    borderWidth: 1,
+    borderColor: '#84cc16',
+    borderRadius: 10,
+    padding: 12,
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  profileRatingsButtonText: {
+    color: '#d9f99d',
+    fontWeight: '800',
+  },
+  profileRatingsSection: {
+    gap: 8,
+    marginBottom: 10,
+  },
+  profileRatingValue: {
+    color: '#fef08a',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  profileReviewRow: {
+    borderTopWidth: 1,
+    borderTopColor: '#334155',
+    paddingTop: 8,
+    marginTop: 6,
   },
   myOrdersHeader: {
     marginTop: 8,
