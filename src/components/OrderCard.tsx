@@ -210,8 +210,11 @@ export function MyOrderCard({
           </Pressable>
           {isEditingCosts && (
             <View style={styles.panelBody}>
+              <Text style={styles.costFieldLabel}>{t('deliveryFee')}</Text>
               <TextInput value={deliveryFeeDraft} onChangeText={setDeliveryFeeDraft} keyboardType="decimal-pad" style={styles.input} placeholder={t('deliveryFee')} placeholderTextColor="#64748b" />
+              <Text style={styles.costFieldLabel}>{t('processingFee')}</Text>
               <TextInput value={processingFeeDraft} onChangeText={setProcessingFeeDraft} keyboardType="decimal-pad" style={styles.input} placeholder={t('processingFee')} placeholderTextColor="#64748b" />
+              <Text style={styles.costFieldLabel}>{t('minimumOrderValue')}</Text>
               <TextInput value={minimumOrderDraft} onChangeText={setMinimumOrderDraft} keyboardType="decimal-pad" style={styles.input} placeholder={t('minimumOrderValue')} placeholderTextColor="#64748b" />
               <Pressable style={styles.secondaryButton} onPress={() => {
                 onCostsChange(order.id, Number(deliveryFeeDraft.replace(',', '.')), Number(processingFeeDraft.replace(',', '.')), minimumOrderDraft.trim() ? Number(minimumOrderDraft.replace(',', '.')) : null);
@@ -646,6 +649,13 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '800',
     marginTop: 4,
+  },
+  costFieldLabel: {
+    color: '#cbd5e1',
+    fontSize: 12,
+    fontWeight: '800',
+    marginTop: 6,
+    marginBottom: 2,
   },
   input: {
     borderWidth: 1,
