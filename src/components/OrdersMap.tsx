@@ -1,7 +1,6 @@
 import { Alert, Image, Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useState } from 'react';
 import MapView, { Marker, PROVIDER_GOOGLE, type MapPressEvent } from 'react-native-maps';
-import * as Location from 'expo-location';
 
 import { formatDistance } from '../formatters';
 import { translate, type Language, type TranslationKey } from '../i18n';
@@ -48,28 +47,6 @@ function platformInitials(platform: string): string {
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase() ?? '')
     .join('');
-}
-
-function readableAddress(address: Location.LocationGeocodedAddress): string {
-  return [
-    address.street,
-    address.streetNumber,
-    address.city,
-    address.region,
-    address.postalCode,
-    address.country,
-  ].filter(Boolean).join(', ');
-}
-
-async function addressForCoordinate(coordinate: Coordinate): Promise<string> {
-  try {
-    const results = await Location.reverseGeocodeAsync(coordinate);
-    const formatted = results[0] ? readableAddress(results[0]) : '';
-    if (formatted) return formatted;
-  } catch {
-    // Google Maps can still open the route using raw coordinates.
-  }
-  return `${coordinate.latitude},${coordinate.longitude}`;
 }
 
 function PlatformLogo({ platform, onReady }: { platform: string; onReady?: () => void }) {
@@ -126,14 +103,10 @@ export function OrdersMap({ language, orders, userLocation, radiusMeters }: Orde
     if (!selectedOrder) {
       return;
     }
-    const [originAddress, destinationAddress] = await Promise.all([
-      addressForCoordinate(userLocation),
-      addressForCoordinate({ latitude: selectedOrder.latitude, longitude: selectedOrder.longitude }),
-    ]);
     const params = new URLSearchParams({
       api: '1',
-      origin: originAddress,
-      destination: destinationAddress,
+      origin: `${userLocation.latitude.toFixed(7)},${userLocation.longitude.toFixed(7)}`,
+      destination: `${selectedOrder.latitude.toFixed(7)},${selectedOrder.longitude.toFixed(7)}`,
       travelmode: travelMode,
     });
     try {
