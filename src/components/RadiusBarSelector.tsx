@@ -12,6 +12,7 @@ type RadiusBarSelectorProps = {
 
 export function RadiusBarSelector({ language, value, onChange }: RadiusBarSelectorProps) {
   const selectedIndex = Math.max(RADIUS_OPTIONS.indexOf(value), 0);
+  const isNotRecommended = value >= 2000;
   const progressPercent =
     RADIUS_OPTIONS.length <= 1 ? 100 : (selectedIndex / (RADIUS_OPTIONS.length - 1)) * 100;
 
@@ -20,7 +21,13 @@ export function RadiusBarSelector({ language, value, onChange }: RadiusBarSelect
       <View style={styles.radiusTrackArea}>
         <View style={styles.radiusTrackRail}>
           <View style={styles.radiusTrackBase} />
-          <View style={[styles.radiusTrackFill, { width: `${progressPercent}%` }]} />
+          <View
+            style={[
+              styles.radiusTrackFill,
+              isNotRecommended && styles.radiusTrackFillNotRecommended,
+              { width: `${progressPercent}%` },
+            ]}
+          />
         </View>
         <View style={styles.radiusStepsRow}>
           {RADIUS_OPTIONS.map((radius, index) => {
@@ -33,10 +40,16 @@ export function RadiusBarSelector({ language, value, onChange }: RadiusBarSelect
                   style={[
                     styles.radiusDot,
                     isReached && styles.radiusDotReached,
+                    isReached && isNotRecommended && styles.radiusDotReachedNotRecommended,
                     isSelected && styles.radiusDotSelected,
+                    isSelected && isNotRecommended && styles.radiusDotSelectedNotRecommended,
                   ]}
                 />
-                <Text style={[styles.radiusLabel, isSelected && styles.radiusLabelSelected]}>
+                <Text style={[
+                  styles.radiusLabel,
+                  isSelected && styles.radiusLabelSelected,
+                  isSelected && isNotRecommended && styles.radiusLabelNotRecommended,
+                ]}>
                   {labelRadius(radius)}
                 </Text>
               </Pressable>
@@ -44,8 +57,9 @@ export function RadiusBarSelector({ language, value, onChange }: RadiusBarSelect
           })}
         </View>
       </View>
-      <Text style={styles.radiusValueText}>
+      <Text style={[styles.radiusValueText, isNotRecommended && styles.radiusValueTextNotRecommended]}>
         {translate(language, 'selected')}: {formatDistance(value)}
+        {isNotRecommended ? ` · ${translate(language, 'notRecommended')}` : ''}
       </Text>
     </View>
   );
@@ -84,6 +98,9 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: '#84cc16',
   },
+  radiusTrackFillNotRecommended: {
+    backgroundColor: '#ef4444',
+  },
   radiusStepsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -107,11 +124,19 @@ const styles = StyleSheet.create({
     backgroundColor: '#a3e635',
     borderColor: '#a3e635',
   },
+  radiusDotReachedNotRecommended: {
+    backgroundColor: '#ef4444',
+    borderColor: '#ef4444',
+  },
   radiusDotSelected: {
     width: 14,
     height: 14,
     backgroundColor: '#d9f99d',
     borderColor: '#ecfccb',
+  },
+  radiusDotSelectedNotRecommended: {
+    backgroundColor: '#fecaca',
+    borderColor: '#fee2e2',
   },
   radiusLabel: {
     color: '#94a3b8',
@@ -121,9 +146,15 @@ const styles = StyleSheet.create({
   radiusLabelSelected: {
     color: '#ecfccb',
   },
+  radiusLabelNotRecommended: {
+    color: '#fecaca',
+  },
   radiusValueText: {
     color: '#d9f99d',
     fontSize: 12,
     fontWeight: '700',
+  },
+  radiusValueTextNotRecommended: {
+    color: '#fca5a5',
   },
 });

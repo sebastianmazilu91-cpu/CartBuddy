@@ -1,5 +1,6 @@
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useState } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { JOIN_RESERVATION_MINUTES, MAX_PRODUCT_LINK_SLOTS } from '../constants';
 import {
@@ -91,6 +92,7 @@ export function MyOrderCard({
   onResolveCapacityRequest,
 }: MyOrderCardProps) {
   const t = (key: TranslationKey) => translate(language, key);
+  const safeAreaInsets = useSafeAreaInsets();
   const isOrganizer = order.created_by === currentUserName;
   const [ratingScores, setRatingScores] = useState<Record<string, number>>({});
   const [ratingComments, setRatingComments] = useState<Record<string, string>>({});
@@ -110,7 +112,12 @@ export function MyOrderCard({
         <Text style={styles.panelToggleText}>{t('viewOrderDetails')}</Text>
       </Pressable>
       <Modal visible={isDetailsOpen} animationType="slide" onRequestClose={() => setIsDetailsOpen(false)}>
-        <ScrollView contentContainerStyle={styles.detailsModal}>
+        <ScrollView
+          contentContainerStyle={[
+            styles.detailsModal,
+            { paddingTop: safeAreaInsets.top + 20, paddingBottom: safeAreaInsets.bottom + 24 },
+          ]}
+        >
           <Text style={styles.orderTitle}>{t('orderDetails')}: {order.platform}</Text>
           <Text style={styles.orderMeta}>{t('status')}: {statusLabel(order.status, language)}</Text>
           <Text style={styles.orderMeta}>{t('participants')}: {order.current_people}/{order.min_people}</Text>
@@ -144,7 +151,12 @@ export function MyOrderCard({
         </ScrollView>
       </Modal>
       <Modal visible={selectedMember !== null} animationType="slide" onRequestClose={() => setSelectedMember(null)}>
-        <ScrollView contentContainerStyle={styles.detailsModal}>
+        <ScrollView
+          contentContainerStyle={[
+            styles.detailsModal,
+            { paddingTop: safeAreaInsets.top + 20, paddingBottom: safeAreaInsets.bottom + 24 },
+          ]}
+        >
           <Text style={styles.orderTitle}>{t('participantProfile')}</Text>
           <Text style={styles.ratingUser}>{selectedMember?.user_name}</Text>
           <RatingSummary language={language} summary={selectedMember?.rating_summary ?? null} />
