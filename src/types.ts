@@ -54,6 +54,8 @@ export type OrderItem = {
   creator_rating_summary: UserRatingSummary | null;
   capacity_requests: CapacityRequest[];
   my_capacity_request_status: 'pending' | 'approved' | 'rejected' | null;
+  member_names: string[];
+  member_details: RatingCandidate[];
 };
 
 export type CapacityRequest = {

@@ -1,4 +1,4 @@
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useState } from 'react';
 
 import { JOIN_RESERVATION_MINUTES, MAX_PRODUCT_LINK_SLOTS } from '../constants';
@@ -52,7 +52,7 @@ function RatingSummary({ language, summary }: { language: Language; summary: Use
           {t('participantRating')}: ★ {summary.participant_average}/5 ({summary.participant_count})
         </Text>
       )}
-      {summary.recent_comments.map((item, index) => (
+      {(summary.recent_comments ?? []).map((item, index) => (
         <Text key={`${item.created_at}-${index}`} style={styles.publicComment}>
           “{item.comment}” — {item.reviewer_name}, {item.score}/5
         </Text>
@@ -94,6 +94,8 @@ export function MyOrderCard({
   const isOrganizer = order.created_by === currentUserName;
   const [ratingScores, setRatingScores] = useState<Record<string, number>>({});
   const [ratingComments, setRatingComments] = useState<Record<string, string>>({});
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [selectedMember, setSelectedMember] = useState<(typeof order.member_details)[number] | null>(null);
   const canExtend = isOrganizer && order.status === 'expired' && !order.extended_once;
   const canUpdateStatus = isOrganizer && !['delivered', 'cancelled'].includes(order.status);
 
@@ -104,6 +106,53 @@ export function MyOrderCard({
       <Text style={styles.orderMeta}>
         {t('participants')}: {order.current_people}/{order.min_people}
       </Text>
+      <Pressable onPress={() => setIsDetailsOpen(true)} style={styles.panelToggleButton}>
+        <Text style={styles.panelToggleText}>{t('viewOrderDetails')}</Text>
+      </Pressable>
+      <Modal visible={isDetailsOpen} animationType="slide" onRequestClose={() => setIsDetailsOpen(false)}>
+        <ScrollView contentContainerStyle={styles.detailsModal}>
+          <Text style={styles.orderTitle}>{t('orderDetails')}: {order.platform}</Text>
+          <Text style={styles.orderMeta}>{t('status')}: {statusLabel(order.status, language)}</Text>
+          <Text style={styles.orderMeta}>{t('participants')}: {order.current_people}/{order.min_people}</Text>
+          <Text style={styles.orderMeta}>{t('initiatedBy')}: {order.created_by}</Text>
+          <Text style={styles.orderMeta}>{t('interval')}: {order.max_wait_days} {t('days')}</Text>
+          <Text style={styles.orderMeta}>{t('timeLeft')}: {timeLeftLabel(order.expires_at, language)}</Text>
+          <OrderCosts language={language} order={order} />
+          {isOrganizer && (
+            <View>
+              <Text style={styles.reputationLabel}>{t('participantNames')}</Text>
+              {(order.member_details ?? []).filter((member) => member.category === 'participant').map((member) => (
+                <Pressable
+                  key={member.user_name}
+                  onPress={() => setSelectedMember(member)}
+                  style={styles.publicRatingBox}
+                >
+                  <Text style={styles.ratingAverage}>
+                    {member.user_name} · ★ {member.rating_summary?.participant_average ?? '—'}/5
+                  </Text>
+                  <Text style={styles.panelToggleText}>{t('viewProfileAndReviews')}</Text>
+                </Pressable>
+              ))}
+              {(order.member_details ?? []).filter((member) => member.category === 'participant').length === 0 && (
+                <Text style={styles.noRatings}>{t('participantListUnavailable')}</Text>
+              )}
+            </View>
+          )}
+          <Pressable onPress={() => setIsDetailsOpen(false)} style={styles.secondaryButton}>
+            <Text style={styles.secondaryButtonText}>{t('close')}</Text>
+          </Pressable>
+        </ScrollView>
+      </Modal>
+      <Modal visible={selectedMember !== null} animationType="slide" onRequestClose={() => setSelectedMember(null)}>
+        <ScrollView contentContainerStyle={styles.detailsModal}>
+          <Text style={styles.orderTitle}>{t('participantProfile')}</Text>
+          <Text style={styles.ratingUser}>{selectedMember?.user_name}</Text>
+          <RatingSummary language={language} summary={selectedMember?.rating_summary ?? null} />
+          <Pressable onPress={() => setSelectedMember(null)} style={styles.secondaryButton}>
+            <Text style={styles.secondaryButtonText}>{t('close')}</Text>
+          </Pressable>
+        </ScrollView>
+      </Modal>
       <Text style={styles.orderMeta}>{t('interval')}: {order.max_wait_days} {t('days')}</Text>
       <Text style={styles.orderMeta}>{t('timeLeft')}: {timeLeftLabel(order.expires_at, language)}</Text>
       <Text style={styles.orderMeta}>{t('extensionUsed')}: {order.extended_once ? t('yes') : t('no')}</Text>
@@ -157,10 +206,10 @@ export function MyOrderCard({
         </View>
       )}
 
-      {isOrganizer && order.capacity_requests.length > 0 && (
+      {isOrganizer && (order.capacity_requests?.length ?? 0) > 0 && (
         <View style={styles.capacityPanel}>
           <Text style={styles.ratingTitle}>{t('extraSpotRequests')}</Text>
-          {order.capacity_requests.map((request) => (
+          {(order.capacity_requests ?? []).map((request) => (
             <View key={request.id} style={styles.capacityRequestRow}>
               <Text style={styles.ratingUser}>{request.user_name}</Text>
               <View style={styles.capacityActions}>
@@ -182,10 +231,10 @@ export function MyOrderCard({
         </View>
       )}
 
-      {order.status === 'delivered' && order.rating_candidates.length > 0 && (
+      {order.status === 'delivered' && (order.rating_candidates?.length ?? 0) > 0 && (
         <View style={styles.ratingPanel}>
           <Text style={styles.ratingTitle}>{t('rateOrderMembers')}</Text>
-          {order.rating_candidates.map((candidate) => (
+          {(order.rating_candidates ?? []).map((candidate) => (
             <View key={candidate.user_name} style={styles.ratingRow}>
               <View style={styles.ratingIdentity}>
                 <Text style={styles.ratingUser}>{candidate.user_name}</Text>
@@ -503,6 +552,12 @@ export function NearbyOrderCard({
 }
 
 const styles = StyleSheet.create({
+  detailsModal: {
+    flexGrow: 1,
+    backgroundColor: '#0f172a',
+    padding: 24,
+    gap: 10,
+  },
   orderCard: {
     borderWidth: 1,
     borderColor: '#334155',

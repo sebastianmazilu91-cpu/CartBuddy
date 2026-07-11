@@ -365,6 +365,15 @@ def _build_order_response(
     )
     response.creator_rating_summary = _user_rating_summary(connection, row["created_by"])
     if user_name == row["created_by"]:
+        response.member_names = _member_names_for_order(connection, row["id"])
+        response.member_details = [
+            RatingCandidateResponse(
+                user_name=member_name,
+                category="organizer" if member_name == row["created_by"] else "participant",
+                rating_summary=_user_rating_summary(connection, member_name),
+            )
+            for member_name in response.member_names
+        ]
         requests = connection.execute(
             """
             SELECT id, user_name, status, created_at
