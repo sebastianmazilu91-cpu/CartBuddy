@@ -66,6 +66,7 @@ import { MyOrderCard, NearbyOrderCard } from './src/components/OrderCard';
 import { OrdersMap } from './src/components/OrdersMap';
 import { ChipButton } from './src/components/ChipButton';
 import { RadiusBarSelector } from './src/components/RadiusBarSelector';
+import { OrderLocationPicker } from './src/components/OrderLocationPicker';
 import { LANGUAGES, translate, type Language, type TranslationKey } from './src/i18n';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -179,6 +180,9 @@ export default function App() {
   const [minimumOrderValue, setMinimumOrderValue] = useState('');
   const [selectedCurrency, setSelectedCurrency] = useState('RON');
   const [isCurrencyDropdownOpen, setIsCurrencyDropdownOpen] = useState(false);
+  const [orderLocationMode, setOrderLocationMode] = useState<'current' | 'custom'>('current');
+  const [customOrderLocation, setCustomOrderLocation] = useState<Coordinate | null>(null);
+  const [isOrderLocationPickerOpen, setIsOrderLocationPickerOpen] = useState(false);
 
   const [nearbyRadiusFilter, setNearbyRadiusFilter] = useState<number>(1000);
   const [nearbyPlatformFilter, setNearbyPlatformFilter] = useState<string>(ALL_PLATFORMS);
@@ -771,7 +775,8 @@ export default function App() {
   }
 
   async function createOrder() {
-    if (!myLocation) {
+    const orderLocation = orderLocationMode === 'custom' ? customOrderLocation : myLocation;
+    if (!orderLocation) {
       Alert.alert(t('locationUnavailable'), t('noValidLocation'));
       return;
     }
@@ -807,8 +812,8 @@ export default function App() {
           platform: platformForOrder,
           min_people: selectedMinPeople,
           max_wait_days: selectedWaitDays,
-          latitude: myLocation.latitude,
-          longitude: myLocation.longitude,
+          latitude: orderLocation.latitude,
+          longitude: orderLocation.longitude,
           delivery_fee: parsedDeliveryFee,
           processing_fee: parsedProcessingFee,
           minimum_order_value: parsedMinimumValue,
@@ -1183,6 +1188,20 @@ export default function App() {
     }
   }
 
+  async function updateOrderLocation(orderId: string, latitude: number, longitude: number) {
+    try {
+      const updated = await fetchJson<OrderItem>(`${API_BASE_URL}/orders/${orderId}/location`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ latitude, longitude }),
+      });
+      setMyOrders((items) => items.map((item) => item.id === orderId ? updated : item));
+      setOrders((items) => items.map((item) => item.id === orderId ? updated : item));
+    } catch {
+      Alert.alert(t('error'), t('locationUpdateFailed'));
+    }
+  }
+
   async function openProductLink(url: string) {
     try {
       await Linking.openURL(url);
@@ -1441,6 +1460,7 @@ export default function App() {
                     onExtend={extendOrder}
                     onStatusChange={updateOrderStatus}
                     onCostsChange={updateOrderCosts}
+                    onLocationChange={updateOrderLocation}
                     onRate={rateOrderMember}
                     isProductsOpen={expandedLinksOrderIds.has(order.id)}
                     productLinks={orderLinksByOrderId[order.id] ?? []}
@@ -1511,6 +1531,47 @@ export default function App() {
             </View>
 
             <Text style={styles.sectionTitle}>{t('matchingRadius')}</Text>
+            <Text style={styles.profileLabel}>{t('orderLocation')}</Text>
+            <View style={styles.chipWrap}>
+              <ChipButton
+                label={t('currentLocation')}
+                selected={orderLocationMode === 'current'}
+                onPress={() => setOrderLocationMode('current')}
+              />
+              <ChipButton
+                label={t('chooseOnMap')}
+                selected={orderLocationMode === 'custom'}
+                onPress={() => {
+                  const initial = customOrderLocation ?? myLocation ?? {
+                    latitude: currentUser.latitude,
+                    longitude: currentUser.longitude,
+                  };
+                  setCustomOrderLocation(initial);
+                  setIsOrderLocationPickerOpen(true);
+                }}
+              />
+            </View>
+            {orderLocationMode === 'custom' && customOrderLocation && (
+              <Pressable onPress={() => setIsOrderLocationPickerOpen(true)} style={styles.locationSelectionBox}>
+                <Text style={styles.profileValue}>{t('selectedLocation')}</Text>
+                <Text style={styles.smallNote}>
+                  {customOrderLocation.latitude.toFixed(5)}, {customOrderLocation.longitude.toFixed(5)}
+                </Text>
+              </Pressable>
+            )}
+            {customOrderLocation && (
+              <OrderLocationPicker
+                language={language}
+                visible={isOrderLocationPickerOpen}
+                value={customOrderLocation}
+                onChange={setCustomOrderLocation}
+                onClose={() => setIsOrderLocationPickerOpen(false)}
+                onConfirm={() => {
+                  setOrderLocationMode('custom');
+                  setIsOrderLocationPickerOpen(false);
+                }}
+              />
+            )}
             <RadiusBarSelector language={language} value={selectedRadius} onChange={setSelectedRadius} />
 
             <Text style={styles.sectionTitle}>{t('orderCosts')}</Text>
@@ -1918,6 +1979,14 @@ const styles = StyleSheet.create({
     padding: 10,
     backgroundColor: '#0b1220',
     gap: 3,
+    marginBottom: 8,
+  },
+  locationSelectionBox: {
+    borderWidth: 1,
+    borderColor: '#38bdf8',
+    borderRadius: 10,
+    backgroundColor: '#0b1220',
+    padding: 10,
     marginBottom: 8,
   },
   profileLanguageOptions: {

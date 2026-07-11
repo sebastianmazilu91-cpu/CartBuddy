@@ -28,6 +28,7 @@ from .schemas import (
     SubmitRatingRequest,
     UpdateOrderStatusRequest,
     UpdateOrderCostsRequest,
+    UpdateOrderLocationRequest,
     UpdateProfileRequest,
     UserResponse,
     UserRatingSummaryResponse,
@@ -56,6 +57,7 @@ from .service import (
     submit_order_rating,
     update_order_status,
     update_order_costs,
+    update_order_location,
 )
 
 
@@ -427,6 +429,23 @@ def patch_order_costs(order_id: str, payload: UpdateOrderCostsRequest,
     if item is None:
         if reason == "not_owner":
             raise HTTPException(status_code=403, detail="Only creator can update costs")
+        if reason == "terminal_status":
+            raise HTTPException(status_code=409, detail="Order is already terminal")
+        raise HTTPException(status_code=404, detail="Order not found")
+    return item
+
+
+@app.patch("/orders/{order_id}/location", response_model=OrderResponse)
+def patch_order_location(order_id: str, payload: UpdateOrderLocationRequest,
+                         current_user: dict = Depends(require_user)) -> OrderResponse:
+    item, reason = update_order_location(
+        order_id, current_user["display_name"], payload.latitude, payload.longitude
+    )
+    if item is None:
+        if reason == "not_owner":
+            raise HTTPException(status_code=403, detail="Only creator can update location")
+        if reason == "has_participants":
+            raise HTTPException(status_code=409, detail="Location is locked after a participant joins")
         if reason == "terminal_status":
             raise HTTPException(status_code=409, detail="Order is already terminal")
         raise HTTPException(status_code=404, detail="Order not found")

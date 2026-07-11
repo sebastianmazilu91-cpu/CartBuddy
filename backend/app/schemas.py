@@ -150,6 +150,11 @@ class UpdateOrderCostsRequest(BaseModel):
     minimum_order_value: float | None = Field(default=None, ge=0)
 
 
+class UpdateOrderLocationRequest(BaseModel):
+    latitude: float = Field(ge=-90, le=90)
+    longitude: float = Field(ge=-180, le=180)
+
+
 class SubmitRatingRequest(BaseModel):
     target_user_name: str = Field(min_length=2, max_length=64)
     score: int = Field(ge=1, le=5)

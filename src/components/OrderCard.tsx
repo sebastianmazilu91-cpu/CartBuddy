@@ -12,6 +12,7 @@ import {
 } from '../formatters';
 import { translate, type Language, type TranslationKey } from '../i18n';
 import type { OrderItem, OrderMessageItem, OrderStatus, ProductLinkItem, UserRatingSummary } from '../types';
+import { OrderLocationPicker } from './OrderLocationPicker';
 
 const CURRENCY_SYMBOLS: Record<string, string> = {
   EUR: '€', USD: '$', RON: 'lei', GBP: '£', MDL: 'L', CHF: 'CHF',
@@ -74,6 +75,7 @@ type MyOrderCardProps = {
   onExtend: (orderId: string) => void;
   onStatusChange: (orderId: string, status: OrderStatus) => void;
   onCostsChange: (orderId: string, deliveryFee: number, processingFee: number, minimumOrderValue: number | null) => void;
+  onLocationChange: (orderId: string, latitude: number, longitude: number) => void;
   onRate: (orderId: string, targetUserName: string, score: number, comment: string) => void;
   isProductsOpen: boolean;
   productLinks: ProductLinkItem[];
@@ -90,6 +92,7 @@ export function MyOrderCard({
   onExtend,
   onStatusChange,
   onCostsChange,
+  onLocationChange,
   onRate,
   isProductsOpen,
   productLinks,
@@ -109,6 +112,8 @@ export function MyOrderCard({
   const [deliveryFeeDraft, setDeliveryFeeDraft] = useState(String(order.delivery_fee));
   const [processingFeeDraft, setProcessingFeeDraft] = useState(String(order.processing_fee));
   const [minimumOrderDraft, setMinimumOrderDraft] = useState(order.minimum_order_value === null ? '' : String(order.minimum_order_value));
+  const [isLocationPickerOpen, setIsLocationPickerOpen] = useState(false);
+  const [locationDraft, setLocationDraft] = useState({ latitude: order.latitude, longitude: order.longitude });
   const canExtend = isOrganizer && order.status === 'expired' && !order.extended_once;
   const canUpdateStatus = isOrganizer && !['delivered', 'cancelled'].includes(order.status);
 
@@ -180,6 +185,24 @@ export function MyOrderCard({
       <Text style={styles.orderMeta}>{t('timeLeft')}: {timeLeftLabel(order.expires_at, language)}</Text>
       <Text style={styles.orderMeta}>{t('extensionUsed')}: {order.extended_once ? t('yes') : t('no')}</Text>
       <OrderCosts language={language} order={order} />
+      {isOrganizer && order.current_people === 1 && !['delivered', 'cancelled'].includes(order.status) && (
+        <>
+          <Pressable onPress={() => setIsLocationPickerOpen(true)} style={styles.panelToggleButton}>
+            <Text style={styles.panelToggleText}>{t('editOrderLocation')}</Text>
+          </Pressable>
+          <OrderLocationPicker
+            language={language}
+            visible={isLocationPickerOpen}
+            value={locationDraft}
+            onChange={setLocationDraft}
+            onClose={() => setIsLocationPickerOpen(false)}
+            onConfirm={() => {
+              onLocationChange(order.id, locationDraft.latitude, locationDraft.longitude);
+              setIsLocationPickerOpen(false);
+            }}
+          />
+        </>
+      )}
       {isOrganizer && !['delivered', 'cancelled'].includes(order.status) && (
         <View>
           <Pressable onPress={() => setIsEditingCosts((value) => !value)} style={styles.panelToggleButton}>
