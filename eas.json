@@ -12,7 +12,12 @@
       "distribution": "internal"
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "environment": "production",
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "https://cartbuddy-production.up.railway.app",
+        "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "645903361823-klbb6d17pt0pjih63gtcd8djs8jtnfbq.apps.googleusercontent.com"
+      }
     }
   },
   "submit": {
