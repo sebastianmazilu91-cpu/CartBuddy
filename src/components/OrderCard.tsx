@@ -118,10 +118,10 @@ export function MyOrderCard({
           <Text style={styles.orderMeta}>{t('interval')}: {order.max_wait_days} {t('days')}</Text>
           <Text style={styles.orderMeta}>{t('timeLeft')}: {timeLeftLabel(order.expires_at, language)}</Text>
           <OrderCosts language={language} order={order} />
-          {isOrganizer && (
+          {order.join_state === 'joined' && (
             <View>
               <Text style={styles.reputationLabel}>{t('participantNames')}</Text>
-              {(order.member_details ?? []).filter((member) => member.category === 'participant').map((member) => (
+              {(order.member_details ?? []).filter((member) => member.user_name !== order.created_by).map((member) => (
                 <Pressable
                   key={member.user_name}
                   onPress={() => setSelectedMember(member)}
@@ -133,7 +133,7 @@ export function MyOrderCard({
                   <Text style={styles.panelToggleText}>{t('viewProfileAndReviews')}</Text>
                 </Pressable>
               ))}
-              {(order.member_details ?? []).filter((member) => member.category === 'participant').length === 0 && (
+              {(order.member_details ?? []).filter((member) => member.user_name !== order.created_by).length === 0 && (
                 <Text style={styles.noRatings}>{t('participantListUnavailable')}</Text>
               )}
             </View>

@@ -364,7 +364,7 @@ def _build_order_response(
         priority_score=priority_score,
     )
     response.creator_rating_summary = _user_rating_summary(connection, row["created_by"])
-    if user_name == row["created_by"]:
+    if join_state == "joined":
         response.member_names = _member_names_for_order(connection, row["id"])
         response.member_details = [
             RatingCandidateResponse(
@@ -374,6 +374,7 @@ def _build_order_response(
             )
             for member_name in response.member_names
         ]
+    if user_name == row["created_by"]:
         requests = connection.execute(
             """
             SELECT id, user_name, status, created_at

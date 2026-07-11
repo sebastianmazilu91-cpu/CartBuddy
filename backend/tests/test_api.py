@@ -220,6 +220,13 @@ def test_join_order_requires_reservation_then_confirmation(client: TestClient) -
 
     confirm_response = client.post(f"/orders/{order['id']}/join", headers=auth_headers(member))
     assert confirm_response.status_code == 200
+
+    organizer_orders = client.get("/orders/mine", headers=auth_headers(creator)).json()["items"]
+    organizer_order = next(item for item in organizer_orders if item["id"] == order["id"])
+    assert {item["user_name"] for item in organizer_order["member_details"]} == {
+        "Owner",
+        "Member",
+    }
     confirmed = confirm_response.json()
     assert confirmed["join_state"] == "joined"
     assert confirmed["current_people"] == 2
