@@ -67,6 +67,7 @@ import { OrdersMap } from './src/components/OrdersMap';
 import { ChipButton } from './src/components/ChipButton';
 import { RadiusBarSelector } from './src/components/RadiusBarSelector';
 import { OrderLocationPicker } from './src/components/OrderLocationPicker';
+import { HelpModal } from './src/components/HelpModal';
 import { LANGUAGES, translate, type Language, type TranslationKey } from './src/i18n';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -157,6 +158,7 @@ export default function App() {
   const [authToken, setAuthToken] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isRestoringAuth, setIsRestoringAuth] = useState(true);
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [authMode, setAuthMode] = useState<AuthMode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -1256,15 +1258,19 @@ export default function App() {
       <View style={[styles.header, tabletWidthStyle]}>
         <View style={styles.headerTitleRow}>
           <Text style={styles.title}>CartBuddy</Text>
-          <Pressable
-            onPress={() => changeLanguage(language === 'ro' ? 'en' : 'ro')}
-            style={styles.headerLanguageButton}
-          >
-            <Text style={styles.headerLanguageText}>
-              {language.toUpperCase()} {'\u{1F310}'}
-            </Text>
-          </Pressable>
+          <View style={styles.headerActions}>
+            <Pressable onPress={() => setIsHelpOpen(true)} style={styles.headerHelpButton}>
+              <Text style={styles.headerHelpText}>ⓘ {t('help')}</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => changeLanguage(language === 'ro' ? 'en' : 'ro')}
+              style={styles.headerLanguageButton}
+            >
+              <Text style={styles.headerLanguageText}>{language.toUpperCase()} {'\u{1F310}'}</Text>
+            </Pressable>
+          </View>
         </View>
+        <HelpModal language={language} visible={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
         <Text style={styles.subtitle}>{t('commonOrdersSubtitle')}</Text>
       </View>
 
@@ -1784,6 +1790,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     backgroundColor: '#111827',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  headerHelpButton: {
+    borderWidth: 1,
+    borderColor: '#38bdf8',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: '#111827',
+  },
+  headerHelpText: {
+    color: '#bae6fd',
+    fontSize: 12,
+    fontWeight: '800',
   },
   headerLanguageText: {
     color: '#e2e8f0',
