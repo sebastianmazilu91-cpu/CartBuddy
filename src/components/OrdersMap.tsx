@@ -1,6 +1,7 @@
 import { Alert, Image, Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useState } from 'react';
 import MapView, { Marker, PROVIDER_GOOGLE, type MapPressEvent } from 'react-native-maps';
+import * as Location from 'expo-location';
 
 import { formatDistance } from '../formatters';
 import { translate, type Language, type TranslationKey } from '../i18n';
@@ -22,6 +23,15 @@ const PLATFORM_LOGO_DOMAINS: Record<string, string> = {
   'Fashion Days': 'fashiondays.ro',
 };
 
+const PLATFORM_MARKER_IMAGES: Record<string, number> = {
+  Amazon: require('../../assets/platforms/amazon.png'),
+  eMAG: require('../../assets/platforms/emag.png'),
+  Temu: require('../../assets/platforms/temu.png'),
+  AliExpress: require('../../assets/platforms/aliexpress.png'),
+  SHEIN: require('../../assets/platforms/shein.png'),
+  'Fashion Days': require('../../assets/platforms/fashiondays.png'),
+};
+
 function latitudeDeltaForRadius(radiusMeters: number): number {
   return Math.max(0.01, (radiusMeters / 111_320) * 2.4);
 }
@@ -40,9 +50,32 @@ function platformInitials(platform: string): string {
     .join('');
 }
 
-function PlatformLogo({ platform }: { platform: string }) {
+function readableAddress(address: Location.LocationGeocodedAddress): string {
+  return [
+    address.street,
+    address.streetNumber,
+    address.city,
+    address.region,
+    address.postalCode,
+    address.country,
+  ].filter(Boolean).join(', ');
+}
+
+async function addressForCoordinate(coordinate: Coordinate): Promise<string> {
+  try {
+    const results = await Location.reverseGeocodeAsync(coordinate);
+    const formatted = results[0] ? readableAddress(results[0]) : '';
+    if (formatted) return formatted;
+  } catch {
+    // Google Maps can still open the route using raw coordinates.
+  }
+  return `${coordinate.latitude},${coordinate.longitude}`;
+}
+
+function PlatformLogo({ platform, onReady }: { platform: string; onReady?: () => void }) {
   const domain = PLATFORM_LOGO_DOMAINS[platform];
   if (!domain) {
+    onReady?.();
     return (
       <View style={styles.logoFallback}>
         <Text style={styles.logoFallbackText}>{platformInitials(platform) || '?'}</Text>
@@ -50,9 +83,30 @@ function PlatformLogo({ platform }: { platform: string }) {
     );
   }
   return (
-    <Image
-      source={{ uri: `https://www.google.com/s2/favicons?domain=${domain}&sz=64` }}
-      style={styles.platformLogo}
+    <View style={styles.platformLogoCircle}>
+      <Image
+        source={{ uri: `https://www.google.com/s2/favicons?domain=${domain}&sz=64` }}
+        style={styles.platformLogo}
+        resizeMode="contain"
+        onLoadEnd={onReady}
+      />
+    </View>
+  );
+}
+
+function OrderMapMarker({ order, participantLabel, onSelect }: {
+  order: OrderItem;
+  participantLabel: string;
+  onSelect: () => void;
+}) {
+  return (
+    <Marker
+      coordinate={{ latitude: order.latitude, longitude: order.longitude }}
+      title={order.platform}
+      description={`${participantLabel}: ${order.current_people}/${order.min_people}`}
+      onPress={onSelect}
+      image={PLATFORM_MARKER_IMAGES[order.platform]}
+      tracksViewChanges={false}
     />
   );
 }
@@ -72,10 +126,14 @@ export function OrdersMap({ language, orders, userLocation, radiusMeters }: Orde
     if (!selectedOrder) {
       return;
     }
+    const [originAddress, destinationAddress] = await Promise.all([
+      addressForCoordinate(userLocation),
+      addressForCoordinate({ latitude: selectedOrder.latitude, longitude: selectedOrder.longitude }),
+    ]);
     const params = new URLSearchParams({
       api: '1',
-      origin: `${userLocation.latitude},${userLocation.longitude}`,
-      destination: `${selectedOrder.latitude},${selectedOrder.longitude}`,
+      origin: originAddress,
+      destination: destinationAddress,
       travelmode: travelMode,
     });
     try {
@@ -108,20 +166,12 @@ export function OrdersMap({ language, orders, userLocation, radiusMeters }: Orde
         onPress={handleMapPress}
       >
         {orders.map((order) => (
-          <Marker
+          <OrderMapMarker
             key={order.id}
-            coordinate={{ latitude: order.latitude, longitude: order.longitude }}
-            title={order.platform}
-            description={`${t('participants')}: ${order.current_people}/${order.min_people}`}
-            onPress={() => setSelectedOrderId(order.id)}
-          >
-            <View style={styles.markerWrap}>
-              <PlatformLogo platform={order.platform} />
-              <Text style={styles.markerLabel} numberOfLines={1}>
-                {order.platform}
-              </Text>
-            </View>
-          </Marker>
+            order={order}
+            participantLabel={t('participants')}
+            onSelect={() => setSelectedOrderId(order.id)}
+          />
         ))}
       </MapView>
       {selectedOrder ? (
@@ -177,16 +227,27 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   markerWrap: {
+    width: 86,
+    minHeight: 54,
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 3,
+    overflow: 'visible',
+  },
+  platformLogoCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#ffffff',
+    borderWidth: 2,
+    borderColor: '#e2e8f0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
   },
   platformLogo: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
+    width: 26,
+    height: 26,
   },
   logoFallback: {
     width: 32,
