@@ -1165,6 +1165,24 @@ export default function App() {
     }
   }
 
+  async function updateOrderCosts(orderId: string, delivery: number, processing: number, minimum: number | null) {
+    if (![delivery, processing, minimum ?? 0].every((value) => Number.isFinite(value) && value >= 0)) {
+      Alert.alert(t('error'), t('invalidCosts'));
+      return;
+    }
+    try {
+      const updated = await fetchJson<OrderItem>(`${API_BASE_URL}/orders/${orderId}/costs`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ delivery_fee: delivery, processing_fee: processing, minimum_order_value: minimum }),
+      });
+      setMyOrders((items) => items.map((item) => item.id === orderId ? updated : item));
+      setOrders((items) => items.map((item) => item.id === orderId ? updated : item));
+    } catch {
+      Alert.alert(t('error'), t('costsUpdateFailed'));
+    }
+  }
+
   async function openProductLink(url: string) {
     try {
       await Linking.openURL(url);
@@ -1422,6 +1440,7 @@ export default function App() {
                     currentUserName={currentUser.display_name}
                     onExtend={extendOrder}
                     onStatusChange={updateOrderStatus}
+                    onCostsChange={updateOrderCosts}
                     onRate={rateOrderMember}
                     isProductsOpen={expandedLinksOrderIds.has(order.id)}
                     productLinks={orderLinksByOrderId[order.id] ?? []}

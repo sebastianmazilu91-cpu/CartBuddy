@@ -967,6 +967,24 @@ def update_order_status(order_id: str, user_name: str, status: str) -> tuple[Ord
         return _build_order_response(connection, updated, user_name=user_name), "ok"
 
 
+def update_order_costs(order_id: str, user_name: str, delivery_fee: float, processing_fee: float,
+                       minimum_order_value: float | None) -> tuple[OrderResponse | None, str]:
+    with get_connection(write=True) as connection:
+        row = connection.execute(_order_select_sql("WHERE id = ?"), (order_id,)).fetchone()
+        if row is None:
+            return None, "not_found"
+        if row["created_by"] != user_name:
+            return None, "not_owner"
+        if row["status"] in {"delivered", "cancelled"}:
+            return None, "terminal_status"
+        connection.execute(
+            "UPDATE orders SET delivery_fee = ?, processing_fee = ?, minimum_order_value = ? WHERE id = ?",
+            (delivery_fee, processing_fee, minimum_order_value, order_id),
+        )
+        updated = connection.execute(_order_select_sql("WHERE id = ?"), (order_id,)).fetchone()
+        return _build_order_response(connection, updated, user_name=user_name), "ok"
+
+
 def add_order_link(order_id: str, user_name: str, url: str) -> tuple[OrderLinkResponse | None, str]:
     clean_url = url.strip()
     if not _is_valid_product_url(clean_url):

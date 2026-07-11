@@ -144,6 +144,12 @@ class UpdateOrderStatusRequest(BaseModel):
     status: Literal["ready_to_order", "ordered", "delivered", "cancelled"]
 
 
+class UpdateOrderCostsRequest(BaseModel):
+    delivery_fee: float = Field(ge=0)
+    processing_fee: float = Field(ge=0)
+    minimum_order_value: float | None = Field(default=None, ge=0)
+
+
 class SubmitRatingRequest(BaseModel):
     target_user_name: str = Field(min_length=2, max_length=64)
     score: int = Field(ge=1, le=5)

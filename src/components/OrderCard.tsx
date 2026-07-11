@@ -73,6 +73,7 @@ type MyOrderCardProps = {
   currentUserName: string;
   onExtend: (orderId: string) => void;
   onStatusChange: (orderId: string, status: OrderStatus) => void;
+  onCostsChange: (orderId: string, deliveryFee: number, processingFee: number, minimumOrderValue: number | null) => void;
   onRate: (orderId: string, targetUserName: string, score: number, comment: string) => void;
   isProductsOpen: boolean;
   productLinks: ProductLinkItem[];
@@ -88,6 +89,7 @@ export function MyOrderCard({
   currentUserName,
   onExtend,
   onStatusChange,
+  onCostsChange,
   onRate,
   isProductsOpen,
   productLinks,
@@ -103,6 +105,10 @@ export function MyOrderCard({
   const [ratingComments, setRatingComments] = useState<Record<string, string>>({});
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [selectedMember, setSelectedMember] = useState<(typeof order.member_details)[number] | null>(null);
+  const [isEditingCosts, setIsEditingCosts] = useState(false);
+  const [deliveryFeeDraft, setDeliveryFeeDraft] = useState(String(order.delivery_fee));
+  const [processingFeeDraft, setProcessingFeeDraft] = useState(String(order.processing_fee));
+  const [minimumOrderDraft, setMinimumOrderDraft] = useState(order.minimum_order_value === null ? '' : String(order.minimum_order_value));
   const canExtend = isOrganizer && order.status === 'expired' && !order.extended_once;
   const canUpdateStatus = isOrganizer && !['delivered', 'cancelled'].includes(order.status);
 
@@ -174,6 +180,26 @@ export function MyOrderCard({
       <Text style={styles.orderMeta}>{t('timeLeft')}: {timeLeftLabel(order.expires_at, language)}</Text>
       <Text style={styles.orderMeta}>{t('extensionUsed')}: {order.extended_once ? t('yes') : t('no')}</Text>
       <OrderCosts language={language} order={order} />
+      {isOrganizer && !['delivered', 'cancelled'].includes(order.status) && (
+        <View>
+          <Pressable onPress={() => setIsEditingCosts((value) => !value)} style={styles.panelToggleButton}>
+            <Text style={styles.panelToggleText}>{t('editOrderCosts')}</Text>
+          </Pressable>
+          {isEditingCosts && (
+            <View style={styles.panelBody}>
+              <TextInput value={deliveryFeeDraft} onChangeText={setDeliveryFeeDraft} keyboardType="decimal-pad" style={styles.input} placeholder={t('deliveryFee')} placeholderTextColor="#64748b" />
+              <TextInput value={processingFeeDraft} onChangeText={setProcessingFeeDraft} keyboardType="decimal-pad" style={styles.input} placeholder={t('processingFee')} placeholderTextColor="#64748b" />
+              <TextInput value={minimumOrderDraft} onChangeText={setMinimumOrderDraft} keyboardType="decimal-pad" style={styles.input} placeholder={t('minimumOrderValue')} placeholderTextColor="#64748b" />
+              <Pressable style={styles.secondaryButton} onPress={() => {
+                onCostsChange(order.id, Number(deliveryFeeDraft.replace(',', '.')), Number(processingFeeDraft.replace(',', '.')), minimumOrderDraft.trim() ? Number(minimumOrderDraft.replace(',', '.')) : null);
+                setIsEditingCosts(false);
+              }}>
+                <Text style={styles.secondaryButtonText}>{t('saveCosts')}</Text>
+              </Pressable>
+            </View>
+          )}
+        </View>
+      )}
       <Text style={styles.reputationLabel}>{t('organizerReputation')}</Text>
       <RatingSummary language={language} summary={order.creator_rating_summary} />
 

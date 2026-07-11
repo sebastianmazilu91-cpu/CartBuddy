@@ -27,6 +27,7 @@ from .schemas import (
     RatingCandidateResponse,
     SubmitRatingRequest,
     UpdateOrderStatusRequest,
+    UpdateOrderCostsRequest,
     UpdateProfileRequest,
     UserResponse,
     UserRatingSummaryResponse,
@@ -54,6 +55,7 @@ from .service import (
     resolve_extra_order_spot_request,
     submit_order_rating,
     update_order_status,
+    update_order_costs,
 )
 
 
@@ -411,6 +413,22 @@ def post_order_status(
             raise HTTPException(status_code=409, detail="Order is already terminal")
         if reason == "invalid_status":
             raise HTTPException(status_code=422, detail="Invalid order status")
+        raise HTTPException(status_code=404, detail="Order not found")
+    return item
+
+
+@app.patch("/orders/{order_id}/costs", response_model=OrderResponse)
+def patch_order_costs(order_id: str, payload: UpdateOrderCostsRequest,
+                      current_user: dict = Depends(require_user)) -> OrderResponse:
+    item, reason = update_order_costs(
+        order_id, current_user["display_name"], payload.delivery_fee,
+        payload.processing_fee, payload.minimum_order_value,
+    )
+    if item is None:
+        if reason == "not_owner":
+            raise HTTPException(status_code=403, detail="Only creator can update costs")
+        if reason == "terminal_status":
+            raise HTTPException(status_code=409, detail="Order is already terminal")
         raise HTTPException(status_code=404, detail="Order not found")
     return item
 
