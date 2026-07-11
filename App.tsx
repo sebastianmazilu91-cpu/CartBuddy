@@ -1013,6 +1013,51 @@ export default function App() {
     }
   }
 
+  async function requestExtraSpot(orderId: string) {
+    if (apiStatus !== 'online' || !authToken) {
+      Alert.alert('Backend/Auth', t('authRequired'));
+      return;
+    }
+    try {
+      await fetchJson(`${API_BASE_URL}/orders/${orderId}/capacity-requests`, {
+        method: 'POST',
+        headers: { ...authHeaders() },
+      });
+      await Promise.all([loadNearbyOrders(), loadNotifications()]);
+      Alert.alert(t('extraSpotRequested'), t('extraSpotRequestedMessage'));
+    } catch {
+      Alert.alert(t('error'), t('extraSpotRequestFailed'));
+    }
+  }
+
+  function confirmDeleteNotifications() {
+    Alert.alert(t('deleteNotifications'), t('deleteNotificationsConfirm'), [
+      { text: t('cancel'), style: 'cancel' },
+      {
+        text: t('deleteAll'),
+        style: 'destructive',
+        onPress: () => void deleteAllNotifications(),
+      },
+    ]);
+  }
+
+  async function deleteAllNotifications() {
+    if (apiStatus !== 'online' || !authToken) {
+      Alert.alert('Backend/Auth', t('authRequired'));
+      return;
+    }
+    try {
+      await fetchJson<NotificationsResponse>(`${API_BASE_URL}/notifications`, {
+        method: 'DELETE',
+        headers: { ...authHeaders() },
+      });
+      setNotifications([]);
+      setUnreadNotificationsCount(0);
+    } catch {
+      Alert.alert(t('error'), t('deleteNotificationsFailed'));
+    }
+  }
+
   async function openNearbyOrdersInGoogleMaps() {
     if (!myLocation) {
       Alert.alert(t('locationUnavailable'), t('noValidLocation'));
@@ -1090,6 +1135,14 @@ export default function App() {
     }
   }
 
+  async function openProductLink(url: string) {
+    try {
+      await Linking.openURL(url);
+    } catch {
+      Alert.alert(t('invalidLink'), t('openLinkFailed'));
+    }
+  }
+
   async function rateOrderMember(orderId: string, targetUserName: string, score: number, comment: string) {
     if (apiStatus !== 'online' || !authToken) {
       Alert.alert('Backend/Auth', t('authRequired'));
@@ -1109,6 +1162,23 @@ export default function App() {
       Alert.alert(t('ratingSaved'), t('ratingSavedMessage'));
     } catch {
       Alert.alert(t('error'), t('ratingFailed'));
+    }
+  }
+
+  async function resolveCapacityRequest(orderId: string, requestId: string, approve: boolean) {
+    if (apiStatus !== 'online' || !authToken) {
+      Alert.alert('Backend/Auth', t('authRequired'));
+      return;
+    }
+    try {
+      await fetchJson(`${API_BASE_URL}/orders/${orderId}/capacity-requests/${requestId}?approve=${approve}`, {
+        method: 'POST',
+        headers: { ...authHeaders() },
+      });
+      await Promise.all([loadMyOrders(), loadNearbyOrders(), loadNotifications()]);
+      Alert.alert(t('extraSpotResolved'));
+    } catch {
+      Alert.alert(t('error'), t('extraSpotResolveFailed'));
     }
   }
 
@@ -1201,9 +1271,14 @@ export default function App() {
             isLoadingNotifications={isLoadingNotifications}
             onOpenNearby={() => setActiveTab('nearby')}
             onOpenCreate={() => setActiveTab('create')}
+            onOpenMyOrders={() => {
+              setActiveTab('myorders');
+              void loadMyOrders();
+            }}
             onOpenProfile={() => setActiveTab('profile')}
             onRefreshNotifications={loadNotifications}
             onMarkNotificationRead={markNotificationRead}
+            onDeleteNotifications={confirmDeleteNotifications}
           />
         ) : activeTab === 'profile' ? (
           <View style={styles.card}>
@@ -1257,6 +1332,42 @@ export default function App() {
                 {isProfileSaving ? t('saving') : t('saveProfile')}
               </Text>
             </Pressable>
+          </View>
+        ) : activeTab === 'myorders' ? (
+          <View style={styles.card}>
+            <View style={styles.myOrdersHeader}>
+              <Text style={styles.sectionTitle}>{t('myOrders')}</Text>
+              <Pressable onPress={loadMyOrders}>
+                <Text style={styles.inlineAction}>{t('refresh')}</Text>
+              </Pressable>
+            </View>
+            <Text style={styles.smallNote}>{t('myOrdersDescription')}</Text>
+
+            {isLoadingMyOrders ? (
+              <ActivityIndicator color="#84cc16" />
+            ) : myOrders.length === 0 ? (
+              <Text style={styles.emptyState}>{t('noMyOrders')}</Text>
+            ) : (
+              <View style={styles.ordersSection}>
+                {myOrders.map((order) => (
+                  <MyOrderCard
+                    key={order.id}
+                    language={language}
+                    order={order}
+                    currentUserName={currentUser.display_name}
+                    onExtend={extendOrder}
+                    onStatusChange={updateOrderStatus}
+                    onRate={rateOrderMember}
+                    isProductsOpen={expandedLinksOrderIds.has(order.id)}
+                    productLinks={orderLinksByOrderId[order.id] ?? []}
+                    isLoadingProducts={Boolean(loadingLinksByOrderId[order.id])}
+                    onToggleProducts={toggleOrderLinks}
+                    onOpenProduct={openProductLink}
+                    onResolveCapacityRequest={resolveCapacityRequest}
+                  />
+                ))}
+              </View>
+            )}
           </View>
         ) : activeTab === 'create' ? (
           <View style={styles.card}>
@@ -1377,33 +1488,6 @@ export default function App() {
             <Pressable onPress={createOrder} style={styles.primaryButton}>
               <Text style={styles.primaryButtonText}>{t('publishOrder')}</Text>
             </Pressable>
-
-            <View style={styles.myOrdersHeader}>
-              <Text style={styles.sectionTitle}>{t('myOrders')}</Text>
-              <Pressable onPress={loadMyOrders}>
-                <Text style={styles.inlineAction}>{t('refresh')}</Text>
-              </Pressable>
-            </View>
-
-            {isLoadingMyOrders ? (
-              <ActivityIndicator color="#84cc16" />
-            ) : myOrders.length === 0 ? (
-              <Text style={styles.emptyState}>{t('noMyOrders')}</Text>
-            ) : (
-              <View style={styles.ordersSection}>
-                {myOrders.map((order) => (
-                  <MyOrderCard
-                    key={order.id}
-                    language={language}
-                    order={order}
-                    currentUserName={currentUser.display_name}
-                    onExtend={extendOrder}
-                    onStatusChange={updateOrderStatus}
-                    onRate={rateOrderMember}
-                  />
-                ))}
-              </View>
-            )}
           </View>
         ) : (
           <View style={styles.card}>
@@ -1488,6 +1572,7 @@ export default function App() {
                     messageDraft={orderMessageDraftByOrderId[order.id] ?? ''}
                     isLoadingMessages={Boolean(loadingMessagesByOrderId[order.id])}
                     onJoin={joinOrder}
+                    onRequestExtraSpot={requestExtraSpot}
                     onToggleLinks={toggleOrderLinks}
                     onLinkDraftChange={(orderId, value) =>
                       setOrderLinkDraftByOrderId((previous) => ({

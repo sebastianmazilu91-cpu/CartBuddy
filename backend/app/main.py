@@ -12,6 +12,7 @@ from .schemas import (
     AddOrderLinkRequest,
     AddOrderMessageRequest,
     AuthResponse,
+    CapacityRequestResponse,
     CreateOrderRequest,
     GoogleLoginRequest,
     LoginRequest,
@@ -34,6 +35,7 @@ from .service import (
     add_order_message,
     add_order_link,
     create_order,
+    delete_user_notifications,
     ensure_seed_data,
     extend_order_once,
     get_member_slots_used,
@@ -46,6 +48,8 @@ from .service import (
     mark_user_notification_read,
     process_order_link,
     register_push_token,
+    request_extra_order_spot,
+    resolve_extra_order_spot_request,
     submit_order_rating,
     update_order_status,
 )
@@ -333,6 +337,41 @@ def post_join_order(order_id: str, current_user: dict = Depends(require_user)) -
     return item
 
 
+@app.post("/orders/{order_id}/capacity-requests", response_model=CapacityRequestResponse)
+def post_capacity_request(order_id: str, current_user: dict = Depends(require_user)) -> CapacityRequestResponse:
+    request, reason = request_extra_order_spot(order_id, current_user["display_name"])
+    if request is None:
+        if reason in {"already_member", "already_requested"}:
+            raise HTTPException(status_code=409, detail="Already a member or request already sent")
+        if reason == "not_full":
+            raise HTTPException(status_code=409, detail="Order still has available spots")
+        if reason == "max_capacity":
+            raise HTTPException(status_code=409, detail="Maximum capacity reached")
+        if reason == "not_open":
+            raise HTTPException(status_code=409, detail="Order is not open")
+        raise HTTPException(status_code=404, detail="Order not found")
+    return request
+
+
+@app.post("/orders/{order_id}/capacity-requests/{request_id}", response_model=OrderResponse)
+def post_capacity_request_resolution(
+    order_id: str,
+    request_id: str,
+    approve: bool = Query(),
+    current_user: dict = Depends(require_user),
+) -> OrderResponse:
+    order, reason = resolve_extra_order_spot_request(
+        order_id, request_id, current_user["display_name"], approve
+    )
+    if order is None:
+        if reason == "not_owner":
+            raise HTTPException(status_code=403, detail="Only organizer can resolve requests")
+        if reason == "cannot_expand":
+            raise HTTPException(status_code=409, detail="Order cannot be expanded")
+        raise HTTPException(status_code=404, detail="Order or request not found")
+    return order
+
+
 @app.post("/orders/{order_id}/extend", response_model=OrderResponse)
 def post_extend_order(order_id: str, current_user: dict = Depends(require_user)) -> OrderResponse:
     item, reason = extend_order_once(order_id=order_id, user_name=current_user["display_name"])
@@ -526,3 +565,9 @@ def post_notification_read(notification_id: str, current_user: dict = Depends(re
         raise HTTPException(status_code=404, detail="Notification not found")
     items, unread_count = list_user_notifications(current_user["display_name"], limit=30)
     return NotificationsResponse(items=items, unread_count=unread_count)
+
+
+@app.delete("/notifications", response_model=NotificationsResponse)
+def delete_notifications(current_user: dict = Depends(require_user)) -> NotificationsResponse:
+    delete_user_notifications(current_user["display_name"])
+    return NotificationsResponse(items=[], unread_count=0)

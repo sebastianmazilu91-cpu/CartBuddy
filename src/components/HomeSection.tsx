@@ -11,9 +11,11 @@ type HomeSectionProps = {
   isLoadingNotifications: boolean;
   onOpenNearby: () => void;
   onOpenCreate: () => void;
+  onOpenMyOrders: () => void;
   onOpenProfile: () => void;
   onRefreshNotifications: () => void;
   onMarkNotificationRead: (notificationId: string) => void;
+  onDeleteNotifications: () => void;
 };
 
 export function HomeSection({
@@ -23,9 +25,11 @@ export function HomeSection({
   isLoadingNotifications,
   onOpenNearby,
   onOpenCreate,
+  onOpenMyOrders,
   onOpenProfile,
   onRefreshNotifications,
   onMarkNotificationRead,
+  onDeleteNotifications,
 }: HomeSectionProps) {
   const t = (key: TranslationKey) => translate(language, key);
 
@@ -42,6 +46,10 @@ export function HomeSection({
         <Text style={styles.homeActionSecondaryText}>{t('placeOrder')}</Text>
       </Pressable>
 
+      <Pressable onPress={onOpenMyOrders} style={styles.homeActionSecondary}>
+        <Text style={styles.homeActionSecondaryText}>{t('myOrders')}</Text>
+      </Pressable>
+
       <Pressable onPress={onOpenProfile} style={styles.homeActionSecondary}>
         <Text style={styles.homeActionSecondaryText}>{t('profile')}</Text>
       </Pressable>
@@ -56,6 +64,11 @@ export function HomeSection({
             <Pressable onPress={onRefreshNotifications}>
               <Text style={styles.inlineAction}>{t('refresh')}</Text>
             </Pressable>
+            {notifications.length > 0 && (
+              <Pressable onPress={onDeleteNotifications}>
+                <Text style={styles.deleteAction}>{t('deleteAll')}</Text>
+              </Pressable>
+            )}
           </View>
         </View>
         {isLoadingNotifications ? (
@@ -202,6 +215,11 @@ const styles = StyleSheet.create({
   },
   inlineAction: {
     color: '#d9f99d',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  deleteAction: {
+    color: '#fda4af',
     fontSize: 12,
     fontWeight: '700',
   },

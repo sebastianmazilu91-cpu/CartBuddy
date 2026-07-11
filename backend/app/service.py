@@ -11,6 +11,7 @@ from .db import get_connection
 from .schemas import (
     PLATFORMS,
     CreateOrderRequest,
+    CapacityRequestResponse,
     OrderMessageResponse,
     NotificationResponse,
     OrderLinkResponse,
@@ -363,6 +364,27 @@ def _build_order_response(
         priority_score=priority_score,
     )
     response.creator_rating_summary = _user_rating_summary(connection, row["created_by"])
+    if user_name == row["created_by"]:
+        requests = connection.execute(
+            """
+            SELECT id, user_name, status, created_at
+            FROM order_capacity_requests
+            WHERE order_id = ? AND status = 'pending'
+            ORDER BY created_at
+            """,
+            (row["id"],),
+        ).fetchall()
+        response.capacity_requests = [CapacityRequestResponse(**request) for request in requests]
+    elif user_name:
+        capacity_request = connection.execute(
+            """
+            SELECT status FROM order_capacity_requests
+            WHERE order_id = ? AND user_name = ?
+            """,
+            (row["id"], user_name),
+        ).fetchone()
+        if capacity_request:
+            response.my_capacity_request_status = capacity_request["status"]
     if user_name and row["status"] == "delivered" and join_state == "joined":
         members = _member_names_for_order(connection, row["id"])
         ratings = connection.execute(
@@ -651,6 +673,92 @@ def submit_order_rating(
             comment=comment,
             rating_summary=_user_rating_summary(connection, target_user_name),
         ), "ok"
+
+
+def request_extra_order_spot(order_id: str, user_name: str) -> tuple[CapacityRequestResponse | None, str]:
+    with get_connection(write=True) as connection:
+        _cleanup_expired_reservations(connection)
+        order = connection.execute(_order_select_sql("WHERE id = ?"), (order_id,)).fetchone()
+        if order is None:
+            return None, "not_found"
+        if order["status"] != "open":
+            return None, "not_open"
+        if order["created_by"] == user_name or _user_is_member(connection, order_id, user_name):
+            return None, "already_member"
+        if order["current_people"] < order["min_people"]:
+            return None, "not_full"
+        if order["min_people"] >= 10:
+            return None, "max_capacity"
+
+        request_id = str(uuid4())
+        created_at = utc_now_iso()
+        try:
+            connection.execute(
+                """
+                INSERT INTO order_capacity_requests(id, order_id, user_name, status, created_at)
+                VALUES(?, ?, ?, 'pending', ?)
+                """,
+                (request_id, order_id, user_name, created_at),
+            )
+        except Exception as exc:
+            if "UNIQUE constraint failed" in str(exc):
+                return None, "already_requested"
+            raise
+        _notify_user(
+            connection,
+            user_name=order["created_by"],
+            event_type="capacity_requested",
+            title="Cerere loc suplimentar",
+            message=f"{user_name} doreste sa se alature comenzii {order['platform']}.",
+            related_order_id=order_id,
+        )
+        return CapacityRequestResponse(
+            id=request_id, user_name=user_name, status="pending", created_at=parse_iso(created_at)
+        ), "ok"
+
+
+def resolve_extra_order_spot_request(
+    order_id: str, request_id: str, organizer_name: str, approve: bool
+) -> tuple[OrderResponse | None, str]:
+    with get_connection(write=True) as connection:
+        order = connection.execute(_order_select_sql("WHERE id = ?"), (order_id,)).fetchone()
+        if order is None:
+            return None, "not_found"
+        if order["created_by"] != organizer_name:
+            return None, "not_owner"
+        capacity_request = connection.execute(
+            """
+            SELECT id, user_name FROM order_capacity_requests
+            WHERE id = ? AND order_id = ? AND status = 'pending'
+            """,
+            (request_id, order_id),
+        ).fetchone()
+        if capacity_request is None:
+            return None, "request_not_found"
+
+        new_status = "approved" if approve else "rejected"
+        if approve:
+            if order["status"] != "open" or order["min_people"] >= 10:
+                return None, "cannot_expand"
+            connection.execute("UPDATE orders SET min_people = min_people + 1, current_people = current_people + 1 WHERE id = ?", (order_id,))
+            connection.execute(
+                "INSERT OR IGNORE INTO order_members(order_id, user_name, joined_at) VALUES(?, ?, ?)",
+                (order_id, capacity_request["user_name"], utc_now_iso()),
+            )
+        connection.execute(
+            "UPDATE order_capacity_requests SET status = ?, resolved_at = ? WHERE id = ?",
+            (new_status, utc_now_iso(), request_id),
+        )
+        _notify_user(
+            connection,
+            user_name=capacity_request["user_name"],
+            event_type=f"capacity_{new_status}",
+            title="Cerere aprobata" if approve else "Cerere respinsa",
+            message="Ai fost adaugat in comanda." if approve else "Organizatorul nu a aprobat locul suplimentar.",
+            related_order_id=order_id,
+        )
+        updated = connection.execute(_order_select_sql("WHERE id = ?"), (order_id,)).fetchone()
+        return _build_order_response(connection, updated, user_name=organizer_name), "ok"
 
 
 def join_order(order_id: str, user_name: str) -> tuple[OrderResponse | None, str]:
@@ -1137,3 +1245,12 @@ def mark_user_notification_read(user_name: str, notification_id: str) -> bool:
             (notification_id, user_name),
         )
         return updated.rowcount > 0
+
+
+def delete_user_notifications(user_name: str) -> int:
+    with get_connection(write=True) as connection:
+        deleted = connection.execute(
+            "DELETE FROM user_notifications WHERE user_name = ?",
+            (user_name,),
+        )
+        return deleted.rowcount

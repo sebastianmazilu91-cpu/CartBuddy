@@ -68,9 +68,28 @@ type MyOrderCardProps = {
   onExtend: (orderId: string) => void;
   onStatusChange: (orderId: string, status: OrderStatus) => void;
   onRate: (orderId: string, targetUserName: string, score: number, comment: string) => void;
+  isProductsOpen: boolean;
+  productLinks: ProductLinkItem[];
+  isLoadingProducts: boolean;
+  onToggleProducts: (orderId: string) => void;
+  onOpenProduct: (url: string) => void;
+  onResolveCapacityRequest: (orderId: string, requestId: string, approve: boolean) => void;
 };
 
-export function MyOrderCard({ language, order, currentUserName, onExtend, onStatusChange, onRate }: MyOrderCardProps) {
+export function MyOrderCard({
+  language,
+  order,
+  currentUserName,
+  onExtend,
+  onStatusChange,
+  onRate,
+  isProductsOpen,
+  productLinks,
+  isLoadingProducts,
+  onToggleProducts,
+  onOpenProduct,
+  onResolveCapacityRequest,
+}: MyOrderCardProps) {
   const t = (key: TranslationKey) => translate(language, key);
   const isOrganizer = order.created_by === currentUserName;
   const [ratingScores, setRatingScores] = useState<Record<string, number>>({});
@@ -92,6 +111,29 @@ export function MyOrderCard({ language, order, currentUserName, onExtend, onStat
       <Text style={styles.reputationLabel}>{t('organizerReputation')}</Text>
       <RatingSummary language={language} summary={order.creator_rating_summary} />
 
+      <Pressable onPress={() => onToggleProducts(order.id)} style={styles.panelToggleButton}>
+        <Text style={styles.panelToggleText}>
+          {isProductsOpen ? t('hideOrderProducts') : t('viewOrderProducts')}
+        </Text>
+      </Pressable>
+      {isProductsOpen && (
+        <View style={styles.panelBody}>
+          {isLoadingProducts ? (
+            <ActivityIndicator color="#84cc16" />
+          ) : productLinks.length === 0 ? (
+            <Text style={styles.emptyState}>{t('noOrderProducts')}</Text>
+          ) : (
+            productLinks.map((link) => (
+              <Pressable key={link.id} onPress={() => onOpenProduct(link.url)} style={styles.myOrderProductRow}>
+                <Text style={styles.myOrderProductUser}>{link.user_name}</Text>
+                <Text style={styles.myOrderProductUrl} numberOfLines={2}>{link.url}</Text>
+                <Text style={styles.openProductText}>{t('openProduct')}</Text>
+              </Pressable>
+            ))
+          )}
+        </View>
+      )}
+
       {canExtend && (
         <Pressable onPress={() => onExtend(order.id)} style={styles.secondaryButton}>
           <Text style={styles.secondaryButtonText}>{t('extend10Days')}</Text>
@@ -112,6 +154,31 @@ export function MyOrderCard({ language, order, currentUserName, onExtend, onStat
           <Pressable onPress={() => onStatusChange(order.id, 'cancelled')} style={styles.smallDangerButton}>
             <Text style={styles.smallDangerButtonText}>{t('cancel')}</Text>
           </Pressable>
+        </View>
+      )}
+
+      {isOrganizer && order.capacity_requests.length > 0 && (
+        <View style={styles.capacityPanel}>
+          <Text style={styles.ratingTitle}>{t('extraSpotRequests')}</Text>
+          {order.capacity_requests.map((request) => (
+            <View key={request.id} style={styles.capacityRequestRow}>
+              <Text style={styles.ratingUser}>{request.user_name}</Text>
+              <View style={styles.capacityActions}>
+                <Pressable
+                  onPress={() => onResolveCapacityRequest(order.id, request.id, true)}
+                  style={styles.approveCapacityButton}
+                >
+                  <Text style={styles.smallStatusButtonText}>{t('approve')}</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => onResolveCapacityRequest(order.id, request.id, false)}
+                  style={styles.smallDangerButton}
+                >
+                  <Text style={styles.smallDangerButtonText}>{t('reject')}</Text>
+                </Pressable>
+              </View>
+            </View>
+          ))}
         </View>
       )}
 
@@ -196,6 +263,7 @@ type NearbyOrderCardProps = {
   messageDraft: string;
   isLoadingMessages: boolean;
   onJoin: (orderId: string) => void;
+  onRequestExtraSpot: (orderId: string) => void;
   onToggleLinks: (orderId: string) => void;
   onLinkDraftChange: (orderId: string, value: string) => void;
   onAddProductLink: (orderId: string) => void;
@@ -222,6 +290,7 @@ export function NearbyOrderCard({
   messageDraft,
   isLoadingMessages,
   onJoin,
+  onRequestExtraSpot,
   onToggleLinks,
   onLinkDraftChange,
   onAddProductLink,
@@ -241,6 +310,9 @@ export function NearbyOrderCard({
   const isReserved = !isJoined && !isOwnOrder && isReservationActive;
   const isOrderFull = order.available_slots <= 0;
   const canJoin = order.status === 'open' && !isOwnOrder && !isJoined && !isOrderFull;
+  const canRequestExtraSpot =
+    order.status === 'open' && !isOwnOrder && !isJoined && isOrderFull &&
+    order.min_people < 10 && order.my_capacity_request_status !== 'pending';
   const canManageLinks = isOwnOrder || isJoined;
   const canAddLinks = order.status === 'open' || order.status === 'ready_to_order';
   const canSendMessages = order.status !== 'delivered' && order.status !== 'cancelled';
@@ -277,9 +349,9 @@ export function NearbyOrderCard({
       </Text>
 
       <Pressable
-        onPress={() => onJoin(order.id)}
-        style={[styles.secondaryButton, !canJoin && styles.disabledButton]}
-        disabled={!canJoin}
+        onPress={() => (canJoin ? onJoin(order.id) : onRequestExtraSpot(order.id))}
+        style={[styles.secondaryButton, !canJoin && !canRequestExtraSpot && styles.disabledButton]}
+        disabled={!canJoin && !canRequestExtraSpot}
       >
         <Text style={styles.secondaryButtonText}>
           {isOwnOrder
@@ -290,6 +362,10 @@ export function NearbyOrderCard({
                 ? `${t('confirmIn')} ${reservationTimeLeftLabel(reservationExpiresAt, language)}`
                 : order.status !== 'open'
                   ? t('noLongerAccepting')
+                  : order.my_capacity_request_status === 'pending'
+                  ? t('extraSpotRequestPending')
+                  : isOrderFull && order.min_people < 10
+                  ? t('requestExtraSpot')
                   : isOrderFull
                   ? t('noSlots')
                   : `${t('reserveSpot')} (${JOIN_RESERVATION_MINUTES} min)`}
@@ -717,6 +793,52 @@ const styles = StyleSheet.create({
     color: '#cbd5e1',
     fontSize: 10,
     fontStyle: 'italic',
+  },
+  capacityPanel: {
+    marginTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#334155',
+    paddingTop: 8,
+    gap: 7,
+  },
+  capacityRequestRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  capacityActions: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  approveCapacityButton: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#84cc16',
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+  },
+  myOrderProductRow: {
+    borderWidth: 1,
+    borderColor: '#334155',
+    borderRadius: 9,
+    padding: 8,
+    backgroundColor: '#111827',
+    gap: 2,
+  },
+  myOrderProductUser: {
+    color: '#d9f99d',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  myOrderProductUrl: {
+    color: '#93c5fd',
+    fontSize: 11,
+  },
+  openProductText: {
+    color: '#84cc16',
+    fontSize: 10,
+    fontWeight: '700',
   },
   smallStatusButton: {
     borderRadius: 999,

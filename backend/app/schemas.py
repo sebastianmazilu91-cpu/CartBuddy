@@ -98,6 +98,13 @@ class RatingCandidateResponse(BaseModel):
     rating_summary: UserRatingSummaryResponse | None = None
 
 
+class CapacityRequestResponse(BaseModel):
+    id: str
+    user_name: str
+    status: Literal["pending", "approved", "rejected"]
+    created_at: datetime
+
+
 class OrderResponse(BaseModel):
     id: str
     platform: Platform
@@ -123,6 +130,8 @@ class OrderResponse(BaseModel):
     currency: str
     rating_candidates: list[RatingCandidateResponse] = Field(default_factory=list)
     creator_rating_summary: UserRatingSummaryResponse | None = None
+    capacity_requests: list[CapacityRequestResponse] = Field(default_factory=list)
+    my_capacity_request_status: Literal["pending", "approved", "rejected"] | None = None
 
 
 class NearbyOrdersResponse(BaseModel):

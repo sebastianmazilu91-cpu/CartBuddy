@@ -226,6 +226,41 @@ def test_join_order_requires_reservation_then_confirmation(client: TestClient) -
     assert confirmed["available_slots"] == 0
 
 
+def test_organizer_can_approve_an_extra_buddy_for_a_full_order(client: TestClient) -> None:
+    organizer = register_user(client, "CapacityOrganizer")
+    first_buddy = register_user(client, "CapacityBuddy")
+    extra_buddy = register_user(client, "ExtraBuddy")
+    order = create_order(client, organizer, min_people=2)
+
+    client.post(f"/orders/{order['id']}/join", headers=auth_headers(first_buddy))
+    client.post(f"/orders/{order['id']}/join", headers=auth_headers(first_buddy))
+
+    request_response = client.post(
+        f"/orders/{order['id']}/capacity-requests",
+        headers=auth_headers(extra_buddy),
+    )
+    assert request_response.status_code == 200, request_response.text
+    capacity_request = request_response.json()
+    assert capacity_request["status"] == "pending"
+
+    forbidden = client.post(
+        f"/orders/{order['id']}/capacity-requests/{capacity_request['id']}?approve=true",
+        headers=auth_headers(first_buddy),
+    )
+    assert forbidden.status_code == 403
+
+    approved = client.post(
+        f"/orders/{order['id']}/capacity-requests/{capacity_request['id']}?approve=true",
+        headers=auth_headers(organizer),
+    )
+    assert approved.status_code == 200, approved.text
+    assert approved.json()["min_people"] == 3
+    assert approved.json()["current_people"] == 3
+
+    extra_buddy_orders = client.get("/orders/mine", headers=auth_headers(extra_buddy)).json()["items"]
+    assert any(item["id"] == order["id"] for item in extra_buddy_orders)
+
+
 def test_product_link_limit_is_enforced(client: TestClient) -> None:
     creator = register_user(client, "LinkOwner")
     member = register_user(client, "LinkMember")
@@ -289,6 +324,27 @@ def test_push_token_registration(client: TestClient) -> None:
         ).fetchone()
     assert row["user_name"] == "PushUser"
     assert row["platform"] == "android"
+
+
+def test_user_can_delete_only_their_notifications(client: TestClient) -> None:
+    first_user = register_user(client, "NotificationCleaner")
+    second_user = register_user(client, "NotificationKeeper")
+    create_order(client, first_user)
+    create_order(client, second_user)
+
+    first_before = client.get("/notifications", headers=auth_headers(first_user)).json()
+    second_before = client.get("/notifications", headers=auth_headers(second_user)).json()
+    assert len(first_before["items"]) > 0
+    assert len(second_before["items"]) > 0
+
+    deleted = client.delete("/notifications", headers=auth_headers(first_user))
+    assert deleted.status_code == 200
+    assert deleted.json() == {"items": [], "unread_count": 0}
+
+    first_after = client.get("/notifications", headers=auth_headers(first_user)).json()
+    second_after = client.get("/notifications", headers=auth_headers(second_user)).json()
+    assert first_after["items"] == []
+    assert len(second_after["items"]) == len(second_before["items"])
 
 
 def test_order_chat_requires_membership_and_lists_messages(client: TestClient) -> None:

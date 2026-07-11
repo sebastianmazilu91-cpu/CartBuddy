@@ -1,4 +1,4 @@
-export type Tab = 'home' | 'create' | 'nearby' | 'profile';
+export type Tab = 'home' | 'create' | 'nearby' | 'myorders' | 'profile';
 export type Coordinate = { latitude: number; longitude: number };
 export type ApiStatus = 'checking' | 'online' | 'offline';
 export type AuthMode = 'login' | 'register';
@@ -52,6 +52,15 @@ export type OrderItem = {
   currency: string;
   rating_candidates: RatingCandidate[];
   creator_rating_summary: UserRatingSummary | null;
+  capacity_requests: CapacityRequest[];
+  my_capacity_request_status: 'pending' | 'approved' | 'rejected' | null;
+};
+
+export type CapacityRequest = {
+  id: string;
+  user_name: string;
+  status: 'pending' | 'approved' | 'rejected';
+  created_at: string;
 };
 
 export type RatingCandidate = {

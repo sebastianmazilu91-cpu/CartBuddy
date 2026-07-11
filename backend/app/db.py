@@ -161,6 +161,20 @@ def init_db() -> None:
             )
             """
         )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS order_capacity_requests (
+                id TEXT PRIMARY KEY,
+                order_id TEXT NOT NULL,
+                user_name TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending',
+                created_at TEXT NOT NULL,
+                resolved_at TEXT,
+                UNIQUE(order_id, user_name),
+                FOREIGN KEY (order_id) REFERENCES orders(id)
+            )
+            """
+        )
         _migrate_orders_table(connection)
         _migrate_users_table(connection)
         _migrate_order_member_links_table(connection)
@@ -169,6 +183,7 @@ def init_db() -> None:
         _migrate_order_messages_table(connection)
         _migrate_user_push_tokens_table(connection)
         _migrate_order_ratings_table(connection)
+        _migrate_order_capacity_requests_table(connection)
         connection.commit()
 
 
@@ -357,3 +372,20 @@ def _migrate_order_ratings_table(connection: sqlite3.Connection) -> None:
     )
     if not _column_exists(connection, "order_ratings", "comment"):
         connection.execute("ALTER TABLE order_ratings ADD COLUMN comment TEXT NOT NULL DEFAULT ''")
+
+
+def _migrate_order_capacity_requests_table(connection: sqlite3.Connection) -> None:
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS order_capacity_requests (
+            id TEXT PRIMARY KEY,
+            order_id TEXT NOT NULL,
+            user_name TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'pending',
+            created_at TEXT NOT NULL,
+            resolved_at TEXT,
+            UNIQUE(order_id, user_name),
+            FOREIGN KEY (order_id) REFERENCES orders(id)
+        )
+        """
+    )
